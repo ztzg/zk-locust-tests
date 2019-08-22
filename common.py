@@ -52,9 +52,14 @@ class KazooLocustClient(object):
         if not hosts:
             raise KazooLocustNoHostsProvided()
 
+        # Avoid passing unknown sasl_options to "old" Kazoo.
+        kwargs = {}
+        if sasl_options:
+            kwargs['sasl_options'] = sasl_options
+
         self._client = KazooClient(
             hosts=hosts,
-            sasl_options=sasl_options,
+            **kwargs
         )
 
         self._sasl_options = sasl_options
