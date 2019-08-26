@@ -1,9 +1,9 @@
-from common import KazooLocust, LocustTimer
+from common import ZKLocust, LocustTimer
 
 from locust import TaskSet, task
 
 
-class ExistsMany(KazooLocust):
+class ExistsMany(ZKLocust):
 
     min_wait = 0
     max_wait = 0
@@ -12,7 +12,7 @@ class ExistsMany(KazooLocust):
         def __init__(self, parent):
             super(ExistsMany.task_set, self).__init__(parent)
 
-            self._k = self.client.get_kazoo_client()
+            self._k = self.client.get_zk_client()
             self._i = 0
 
         @task

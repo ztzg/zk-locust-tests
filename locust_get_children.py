@@ -1,10 +1,10 @@
 from locust import TaskSet, task
 
 
-from common import KazooLocust, LocustTimer
+from common import ZKLocust, LocustTimer
 
 
-class GetChildren(KazooLocust):
+class GetChildren(ZKLocust):
     min_wait = 0
     max_wait = 0
 
@@ -12,7 +12,7 @@ class GetChildren(KazooLocust):
         def __init__(self, parent):
             super(GetChildren.task_set, self).__init__(parent)
 
-            self._k = self.client.get_kazoo_client()
+            self._k = self.client.get_zk_client()
             self._n = self.client.create_default_node()
 
         @task

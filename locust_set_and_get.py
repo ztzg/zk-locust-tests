@@ -4,7 +4,7 @@ from locust import TaskSet, task
 
 import kazoo
 
-from common import KazooLocust, LocustTimer
+from common import ZKLocust, LocustTimer
 
 
 key_size = 8
@@ -19,7 +19,7 @@ sequential_keys = False
 key_seq = 0
 
 
-class SetAndGet(KazooLocust):
+class SetAndGet(ZKLocust):
 
     min_wait = 0
     max_wait = 0
@@ -30,7 +30,7 @@ class SetAndGet(KazooLocust):
         def __init__(self, parent):
             super(SetAndGet.task_set, self).__init__(parent)
 
-            self._k = self.client.get_kazoo_client()
+            self._k = self.client.get_zk_client()
 
             if (sequential_keys):
                 global key_seq

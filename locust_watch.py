@@ -3,13 +3,13 @@ import sys
 
 from locust import TaskSet, task, events
 
-from common import KazooLocust
+from common import ZKLocust
 
 
 val_size = 8
 
 
-class Watch(KazooLocust):
+class Watch(ZKLocust):
     min_wait = 0
     max_wait = 100
 
@@ -17,7 +17,7 @@ class Watch(KazooLocust):
         def __init__(self, parent):
             super(Watch.task_set, self).__init__(parent)
 
-            self._k = self.client.get_kazoo_client()
+            self._k = self.client.get_zk_client()
             self._n = self.client.create_default_node()
 
         @task

@@ -1,9 +1,9 @@
 from locust import TaskSet, task
 
-from common import KazooLocust, LocustTimer
+from common import ZKLocust, LocustTimer
 
 
-class Connect(KazooLocust):
+class Connect(ZKLocust):
     min_wait = 0
     max_wait = 0
 

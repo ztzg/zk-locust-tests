@@ -5,7 +5,7 @@ from locust import TaskSet, task
 
 from kazoo.exceptions import NodeExistsError
 
-from common import KazooLocust, LocustTimer
+from common import ZKLocust, LocustTimer
 
 
 key_size = 8
@@ -21,7 +21,7 @@ key_seq = 0
 v = os.getrandom(val_size)
 
 
-class Set(KazooLocust):
+class Set(ZKLocust):
 
     min_wait = 0
     max_wait = 0
@@ -30,7 +30,7 @@ class Set(KazooLocust):
         def __init__(self, parent):
             super(Set.task_set, self).__init__(parent)
 
-            self._k = self.client.get_kazoo_client()
+            self._k = self.client.get_zk_client()
 
             if (sequential_keys):
                 global key_seq

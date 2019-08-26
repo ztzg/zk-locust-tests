@@ -4,10 +4,10 @@ from locust import TaskSet, task
 
 import kazoo
 
-from common import KazooLocust, LocustTimer
+from common import ZKLocust, LocustTimer
 
 
-class CreateAndDelete(KazooLocust):
+class CreateAndDelete(ZKLocust):
     min_wait = 0
     max_wait = 0
 
@@ -17,7 +17,7 @@ class CreateAndDelete(KazooLocust):
         def __init__(self, parent):
             super(CreateAndDelete.task_set, self).__init__(parent)
 
-            self._k = self.client.get_kazoo_client()
+            self._k = self.client.get_zk_client()
 
             try:
                 self._k.create('/kx')

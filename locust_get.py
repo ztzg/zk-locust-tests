@@ -3,9 +3,11 @@ import random
 
 from locust import TaskSet, task
 
-from kazoo.exceptions import NodeExistsError
+from common import ZKLocust, LocustTimer
 
-from common import KazooLocust, LocustTimer
+import zookeeper
+
+import kazoo.exceptions
 
 
 key_size = 8
@@ -19,9 +21,11 @@ sequential_keys = False
 
 key_seq = 0
 v = os.getrandom(val_size)
+# KLUDGE: zkpython does not support binary values!
+v = bytes(byte & 0x7f for byte in v)
 
 
-class Get(KazooLocust):
+class Get(ZKLocust):
 
     min_wait = 0
     max_wait = 0
@@ -30,7 +34,7 @@ class Get(KazooLocust):
         def __init__(self, parent):
             super(Get.task_set, self).__init__(parent)
 
-            self._k = self.client.get_kazoo_client()
+            self._k = self.client.get_zk_client()
 
             if (sequential_keys):
                 global key_seq
@@ -43,7 +47,8 @@ class Get(KazooLocust):
 
             try:
                 self._k.create(n, v)
-            except NodeExistsError:
+            except (zookeeper.NodeExistsException,
+                    kazoo.exceptions.NodeExistsError):
                 pass
 
             self._n = n
