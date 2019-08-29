@@ -16,7 +16,7 @@ An experimental "test harness" for ZooKeeper.
  3. Install and configure ZooKeeper (left as an exercise for the
     reader).
 
- 4. `export KAZOO_LOCUST_HOSTS=<ensemble>`.
+ 4. `export ZK_LOCUST_HOSTS=<ensemble>`.
 
  5. Run a simple test using the Web UI:
 
@@ -66,15 +66,40 @@ An experimental "test harness" for ZooKeeper.
 A number of utilities are provided in `common.py`:
 
   * `KazooLocustClient`: A Locust "client" object which provides
-    helper methods as well as direct access to the Kazoo client via
-    `get_kazoo_client`<
+    helper methods as well as direct access to the Kazoo client object
+    via `get_zk_client`;
 
-  * `KazooLocust`: A Locust subclass which can host task sets and is
+  * `ZKLocustClient`: Similar to `KazooLocustClient`, but its backend
+    is thin wrapper around `zkpython`--which allows exercising the
+    "official" ZooKeeper client library;
+
+  * `ZKLocust`: A Locust subclass which can host task sets and is
     automatically initialized with an instance of `KazooLocustClient`
-    as the client;
+    (default) or `ZKLocustClient` as the client;
 
   * `LocustTimer`: A Python "Context Manager" which makes it easy to
     time requests or segments.
+
+## Environment variables
+
+  * `ZK_LOCUST_HOSTS`: A ZooKeeper "connect string" including the
+    addresses of the ensemble;
+
+  * `ZK_LOCUST_CLIENT`: Selects the `ZKLocust` backend, unless
+    overriden by a subclass.  Valid values include `kazoo` (default)
+    and `zkpython`;
+
+  * `ZK_LOCUST_PSEUDO_ROOT`: A "pseudo root" for tests.  Note that
+    this is not a "chroot" in the ZooKeeper sense; it is purely
+    advisory;
+
+  * `KAZOO_LOCUST_HANDLER`: Selects the Kazoo concurrency "handler."
+    Valid values include `threading` and `gevent`.  The default
+    depends on Kazoo, but normally corresponds to `threading`;
+
+  * `KAZOO_LOCUST_SASL_OPTIONS`: An optional JSON-encoded dictionary
+    of SASL options for the Kazoo backend.  The default is to not
+    authenticate with the server.
 
 ## Base "Locustfiles"
 
