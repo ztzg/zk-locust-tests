@@ -1,9 +1,9 @@
 import time
 import sys
 
-from locust import TaskSet, task, events
+from locust import task, events
 
-from common import ZKLocust
+from common import ZKLocust, ZKLocustTaskSet
 
 
 val_size = 8
@@ -11,7 +11,7 @@ val_size = 8
 
 class Watch(ZKLocust):
 
-    class task_set(TaskSet):
+    class task_set(ZKLocustTaskSet):
         def __init__(self, parent):
             super(Watch.task_set, self).__init__(parent)
 

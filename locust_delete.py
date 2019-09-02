@@ -1,15 +1,15 @@
 from collections import deque
 
-from locust import TaskSet, task
+from locust import task
 
 import kazoo
 
-from common import ZKLocust, LocustTimer
+from common import ZKLocust, ZKLocustTaskSet, LocustTimer
 
 
 class CreateAndDelete(ZKLocust):
 
-    class task_set(TaskSet):
+    class task_set(ZKLocustTaskSet):
         _to_delete = deque()
 
         def __init__(self, parent):

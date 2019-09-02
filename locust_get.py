@@ -1,8 +1,8 @@
 import random
 
-from locust import TaskSet, task
+from locust import task
 
-from common import ZKLocust, LocustTimer
+from common import ZKLocust, ZKLocustTaskSet, LocustTimer
 
 import zookeeper
 
@@ -25,7 +25,7 @@ v = bytearray(random.randint(32, 127) for _ in range(val_size))
 
 class Get(ZKLocust):
 
-    class task_set(TaskSet):
+    class task_set(ZKLocustTaskSet):
         def __init__(self, parent):
             super(Get.task_set, self).__init__(parent)
 

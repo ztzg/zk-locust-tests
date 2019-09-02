@@ -1,6 +1,6 @@
-from locust import TaskSet, task
+from locust import task
 
-from common import ZKLocust, LocustTimer
+from common import ZKLocust, ZKLocustTaskSet, LocustTimer
 
 
 class Connect(ZKLocust):
@@ -9,7 +9,7 @@ class Connect(ZKLocust):
         super(Connect, self).__init__(pseudo_root=None,
                                       autostart=False)
 
-    class task_set(TaskSet):
+    class task_set(ZKLocustTaskSet):
 
         @task(10)
         def connect(self):

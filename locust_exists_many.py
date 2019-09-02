@@ -1,11 +1,11 @@
-from common import ZKLocust, LocustTimer
+from locust import task
 
-from locust import TaskSet, task
+from common import ZKLocust, ZKLocustTaskSet, LocustTimer
 
 
 class ExistsMany(ZKLocust):
 
-    class task_set(TaskSet):
+    class task_set(ZKLocustTaskSet):
         def __init__(self, parent):
             super(ExistsMany.task_set, self).__init__(parent)
 

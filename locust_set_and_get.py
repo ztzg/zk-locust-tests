@@ -1,10 +1,10 @@
 import random
 
-from locust import TaskSet, task
+from locust import task
 
 import kazoo
 
-from common import ZKLocust, LocustTimer
+from common import ZKLocust, ZKLocustTaskSet, LocustTimer
 
 
 key_size = 8
@@ -21,7 +21,7 @@ key_seq = 0
 
 class SetAndGet(ZKLocust):
 
-    class task_set(TaskSet):
+    class task_set(ZKLocustTaskSet):
         _i = 0
 
         def __init__(self, parent):
