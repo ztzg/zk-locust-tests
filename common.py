@@ -140,8 +140,8 @@ class ZKClient(object):
 
 
 class ZKLocustClient(AbstractZKLocustClient):
-    def __init__(self, hosts=_default_hosts, *kwargs):
-        super(ZKLocustClient, self).__init__(*kwargs)
+    def __init__(self, hosts=_default_hosts, **kwargs):
+        super(ZKLocustClient, self).__init__(**kwargs)
 
         self._set_zk_client(ZKClient(hosts))
         # Messy.
@@ -201,6 +201,8 @@ class KazooLocustClient(AbstractZKLocustClient):
                  sasl_options=_default_sasl_options,
                  pseudo_root=_default_pseudo_root,
                  autostart=True):
+        super(KazooLocustClient, self).__init__(pseudo_root=pseudo_root)
+
         if not hosts:
             raise KazooLocustNoHostsException()
 
