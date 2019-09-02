@@ -1,4 +1,5 @@
 import random
+import os
 
 from locust import task
 
@@ -9,8 +10,8 @@ import zookeeper
 import kazoo.exceptions
 
 
-key_size = 8
-val_size = 8
+key_size = int(os.getenv('ZK_LOCUST_KEY_SIZE', '8'))
+val_size = int(os.getenv('ZK_LOCUST_VAL_SIZE', '8'))
 # rate = 0
 # total = 10000
 key_space_size = 128
