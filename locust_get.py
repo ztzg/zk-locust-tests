@@ -1,4 +1,3 @@
-import os
 import random
 
 from locust import TaskSet, task
@@ -20,9 +19,8 @@ sequential_keys = False
 
 
 key_seq = 0
-v = os.getrandom(val_size)
-# KLUDGE: zkpython does not support binary values!
-v = bytes(byte & 0x7f for byte in v)
+# Note: zkpython does not support binary values!
+v = bytearray(random.randint(32, 127) for _ in range(val_size))
 
 
 class Get(ZKLocust):
