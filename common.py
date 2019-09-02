@@ -18,6 +18,9 @@ _default_hosts = os.getenv('ZK_LOCUST_HOSTS') or \
     os.getenv('KAZOO_LOCUST_HOSTS')
 _default_pseudo_root = os.getenv('ZK_LOCUST_PSEUDO_ROOT') or \
     os.getenv('KAZOO_LOCUST_PSEUDO_ROOT') or '/kl'
+_default_min_wait = int(os.getenv('ZK_LOCUST_MIN_WAIT', '0'))
+_default_max_wait = max(int(os.getenv('ZK_LOCUST_MAX_WAIT', '0')),
+                        _default_min_wait)
 
 
 class ZKLocustException(Exception):
@@ -261,6 +264,10 @@ class KazooLocustClient(AbstractZKLocustClient):
 
 
 class ZKLocust(Locust):
+
+    min_wait = _default_min_wait
+    max_wait = _default_max_wait
+
     def __init__(self, client_impl=_default_client):
         super(ZKLocust, self).__init__()
 
