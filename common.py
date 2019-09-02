@@ -3,7 +3,7 @@ import os
 import json
 import threading
 
-from locust import Locust, events
+from locust import Locust, TaskSet, events
 
 import zookeeper
 
@@ -150,6 +150,9 @@ class ZKLocustClient(AbstractZKLocustClient):
         # Messy.
         self.ensure_pseudo_root()
 
+    def stop(self):
+        self.get_zk_client().close()
+
     def create_default_node(self):
         path = self.join_path('/d-')
         flags = zookeeper.EPHEMERAL | zookeeper.SEQUENCE
@@ -279,10 +282,15 @@ class ZKLocust(Locust):
             raise ZKLocustException(
                 "Unknown value for 'client_impl': %s" % (client_impl))
 
-    # TODO(ddiederen): Teardown is a class method!  Cannot do this
-    # here.
-    # def teardown(self):
-    #     self.client.stop()
+    def stop(self):
+        self.client.stop()
+
+
+class ZKLocustTaskSet(TaskSet):
+    def on_stop(self):
+        # super?
+        if isinstance(self.parent, ZKLocust):
+            self.parent.stop()
 
 
 class LocustTimer(object):
