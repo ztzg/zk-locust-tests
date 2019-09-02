@@ -23,9 +23,6 @@ v = os.getrandom(val_size)
 
 class Set(ZKLocust):
 
-    min_wait = 0
-    max_wait = 0
-
     class task_set(TaskSet):
         def __init__(self, parent):
             super(Set.task_set, self).__init__(parent)

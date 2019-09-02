@@ -21,9 +21,6 @@ key_seq = 0
 
 class SetAndGet(ZKLocust):
 
-    min_wait = 0
-    max_wait = 0
-
     class task_set(TaskSet):
         _i = 0
 

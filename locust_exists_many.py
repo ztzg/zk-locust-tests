@@ -5,9 +5,6 @@ from locust import TaskSet, task
 
 class ExistsMany(ZKLocust):
 
-    min_wait = 0
-    max_wait = 0
-
     class task_set(TaskSet):
         def __init__(self, parent):
             super(ExistsMany.task_set, self).__init__(parent)

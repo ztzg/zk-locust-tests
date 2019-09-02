@@ -10,8 +10,6 @@ val_size = 8
 
 
 class Watch(ZKLocust):
-    min_wait = 0
-    max_wait = 100
 
     class task_set(TaskSet):
         def __init__(self, parent):

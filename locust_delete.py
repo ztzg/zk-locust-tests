@@ -8,8 +8,6 @@ from common import ZKLocust, LocustTimer
 
 
 class CreateAndDelete(ZKLocust):
-    min_wait = 0
-    max_wait = 0
 
     class task_set(TaskSet):
         _to_delete = deque()

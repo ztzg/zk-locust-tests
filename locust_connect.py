@@ -4,8 +4,6 @@ from common import ZKLocust, LocustTimer
 
 
 class Connect(ZKLocust):
-    min_wait = 0
-    max_wait = 0
 
     def __init__(self):
         super(Connect, self).__init__(pseudo_root=None,

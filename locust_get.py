@@ -27,9 +27,6 @@ v = bytes(byte & 0x7f for byte in v)
 
 class Get(ZKLocust):
 
-    min_wait = 0
-    max_wait = 0
-
     class task_set(TaskSet):
         def __init__(self, parent):
             super(Get.task_set, self).__init__(parent)
