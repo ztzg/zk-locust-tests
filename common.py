@@ -2,6 +2,7 @@ import time
 import os
 import json
 import threading
+import re
 
 from locust import Locust, TaskSet, events
 
@@ -20,6 +21,15 @@ _default_pseudo_root = os.getenv('ZK_LOCUST_PSEUDO_ROOT') or \
 _default_min_wait = int(os.getenv('ZK_LOCUST_MIN_WAIT', '0'))
 _default_max_wait = max(
     int(os.getenv('ZK_LOCUST_MAX_WAIT', '0')), _default_min_wait)
+
+
+def get_zk_locust_hosts():
+    return _default_hosts
+
+
+def parse_zk_hosts(raw):
+    no_chroot = re.sub(r"/.*", "", raw.strip())
+    return re.split(r"\s*,\s*", no_chroot)
 
 
 class ZKLocustException(Exception):

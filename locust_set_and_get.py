@@ -6,6 +6,9 @@ import kazoo
 
 from common import ZKLocust, ZKLocustTaskSet, LocustTimer
 
+import zk_metrics
+zk_metrics.register_page()
+
 key_size = 8
 val_size = 8
 # rate = 0

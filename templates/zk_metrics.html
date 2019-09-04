@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Locust</title>
+    <link rel="stylesheet" type="text/css" href="../static/style.css?v={{ version }}" media="screen">
+    <link rel="stylesheet" type="text/css" href="./static/style.css?v={{ version }}" media="screen">
+    <link rel="shortcut icon" href="../static/img/favicon.ico" type="image/x-icon"/>
+</head>
+<body class="running">
+    <div class="top">
+        <div class="top-content container">
+            <img src="../static/img/logo.png?v={{ version }}" class="logo" />
+            <div class="boxes">
+                <div class="top_box box_url">
+                    <div class="label">ENSEMBLE</div>
+                    <div class="value" id="ensemble_text" data-ensemble="{{ zk_locust_hosts }}">
+                    </div>
+                </div>
+                <div class="top_box box_status" style="min-width: 100px;">
+                    <div class="label">STATUS</div>
+                    <div class="value" id="refresh_status">IDLE</div>
+                    <div class="refresh_ms" id="refresh_ms"></div>
+                    <a href="#" class="edit_refresh_ms">Edit</a>
+                </div>
+            </div>
+            <div style="clear:both;"></div>
+        </div>
+    </div>
+    <div class="main">
+
+        <div class="edit" id="edit">
+            <div style="position:relative;">
+                <a href="#" class="close_link">Close</a>
+            </div>
+            <div class="padder">
+                <h2>Change Refresh Delay</h2>
+                <form id="edit_form">
+                    <label for="refresh_ms_input">New refresh delay (ms)</label>
+                    <input type="text" name="refresh_ms_input" id="new_refresh_ms" class="val" /><br>
+                    <button id="new_refresh_ms_button">Change</button>
+                </form>
+                <div style="clear:right;"></div>
+            </div>
+        </div>
+
+        <div class="status" id="status">
+            <nav class="menu">
+                <ul class="tabs container">
+                    <li><a href="#">Metrics</a></li>
+                    <li><a href="#">Statistics</a></li>
+                    <li><a href="#" class="chart-tab-link">Charts</a></li>
+                </ul>
+            </nav>
+            <div class="panes container">
+                <div style="display:none;">
+                    <input type="text" id="metrics_filter" class="val" /><br>
+                    <table id="metrics" class="stats">
+                        <thead>
+                            <tr>
+                                <th class="stats_label">Name</th>
+                                <th class="stats_label">Kind</th>
+                                <th class="stats_label">In Stats?</th>
+                                <th class="stats_label">In Charts?</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        </tbody>
+                    </table>
+                </div>
+                <div style="display:none;">
+                    <input type="text" id="stats_filter" class="val" /><br>
+                    <table id="stats" class="stats">
+                        <thead>
+                        </thead>
+                        <tbody>
+                        </tbody>
+                    </table>
+                </div>
+                <div id="charts" style="display:none;">
+                    <input type="text" id="charts_filter" class="val" /><br>
+                    <div class="charts-container"></div>
+                    <p class="note">Note: There is no persistence of these charts, if you refresh this page, new charts will be created.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <nav class="footer">
+        <div class="container">
+        </div>
+    </nav>
+
+
+    <script type="text/javascript" src="../static/jquery-1.11.3.min.js"></script>
+    <script type="text/javascript" src="../static/jquery.jqote2.min.js"></script>
+    <script type="text/javascript" src="../static/jquery.tools.min.js"></script>
+    <!-- echarts from https://github.com/ecomfe/echarts -->
+    <script type="text/javascript" src="../static/echarts.common.min.js"></script>
+    <!-- vintage theme of echarts -->
+    <script type="text/javascript" src="../static/vintage.js"></script>
+
+    <script type="text/x-jqote-template" id="metrics-template">
+        <![CDATA[
+        <tr class="<%=(alternate ? "dark" : "")%>" data-item-name="<%= this.name %>">
+            <td class="name" title="<%= this.name %>"><%= this.name %></td>
+            <td class="name" title="<%= this.kind || '' %>"><%= this.kind || '' %></td>
+            <td class="name"><input type="checkbox" <%= this.inStats? 'checked' : '' %> class="metrics-toggle" data-metric="<%= this.name %>" data-prop="inStats"></td>
+            <td class="name"><input type="checkbox" <%= this.inCharts? 'checked' : '' %> class="metrics-toggle" data-metric="<%= this.name %>" data-prop="inCharts"></td>
+        </tr>
+        <% alternate = !alternate; %>
+        ]]>
+    </script>
+
+    <script type="text/x-jqote-template" id="stats-header-template">
+        <![CDATA[
+        <tr>
+            <th class="stats_label" href="#" data-sortkey="name">Name</th>
+            <th class="stats_label" href="#" data-sortkey="entry">Subkey</th>
+            <th class="stats_label" href="#" data-sortkey="stat" title="Statistic">Stat</th>
+            <% for(var i = 0; i < this.targets.length; i++) { %>
+                <th class="stats_label numeric"><%= this.targets[i].host %></th>
+            <% } %>
+        </tr>
+        ]]>
+    </script>
+
+    <script type="text/x-jqote-template" id="stats-template">
+        <![CDATA[
+            <tr class="<%=(alternate ? "dark" : "")%>" data-item-name="<%= this.name %>" <%= this.visible ? '' : 'style="display: none;"' %>>
+            <td class="name" title="<%= this.name %>"><%= this.name %></td>
+            <td class="name" title="<%= this.entry || '' %>"><%= this.entry || '' %></td>
+            <td class="name" title="<%= this.stat || '' %>"><%= this.stat || '' %></td>
+            <% for(var i = 0; i < this.values.length; i++) { %>
+                <td class="numeric"><%= this.values[i] %></td>
+            <% } %>
+        </tr>
+        <% alternate = !alternate; %>
+        ]]>
+    </script>
+
+    <script type="text/javascript" src="../static/chart.js?v={{ version }}"></script>
+    <script type="text/javascript" src="./static/zk_metrics.js?v={{ version }}"></script>
+</body>
+</html>
