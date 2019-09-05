@@ -14,11 +14,11 @@ from jinja2 import TemplateNotFound
 from locust import __version__ as version
 from locust.web import app
 
-from common import get_zk_locust_hosts, parse_zk_hosts
+from zk_locust import get_zk_hosts, split_zk_hosts
 
 _logger = logging.getLogger(__name__)
 
-_zk_hosts = parse_zk_hosts(get_zk_locust_hosts())
+_zk_hosts = split_zk_hosts(get_zk_hosts())
 _zk_re_port = re.compile(r":\d{1,4}$")
 _zk_metrics_scheme = 'http'
 _zk_metrics_port = 8080
@@ -119,5 +119,6 @@ def proxy(command, index):
     return Response(r.content, r.status_code, [])
 
 
-def register_page(url_prefix='/zk-metrics'):
+def register_zk_metrics_page(url_prefix='/zk-metrics'):
     app.register_blueprint(page, url_prefix=url_prefix)
+    # print(app.url_map)

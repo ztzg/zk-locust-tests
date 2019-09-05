@@ -1,6 +1,10 @@
+import sys
+import os
+
 from locust import task
 
-from common import ZKLocust, ZKLocustTaskSet, LocustTimer
+sys.path.append(os.getcwd())  # See "Common libraries" in Locust docs.
+from zk_locust import ZKLocust, ZKLocustTaskSet, LocustTimer
 
 
 class GetChildren(ZKLocust):

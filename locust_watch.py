@@ -1,9 +1,11 @@
 import time
 import sys
+import os
 
 from locust import task, events
 
-from common import ZKLocust, ZKLocustTaskSet
+sys.path.append(os.getcwd())  # See "Common libraries" in Locust docs.
+from zk_locust import ZKLocust, ZKLocustTaskSet
 
 val_size = 8
 

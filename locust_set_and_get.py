@@ -1,13 +1,16 @@
 import random
+import sys
+import os
 
 from locust import task
 
 import kazoo
 
-from common import ZKLocust, ZKLocustTaskSet, LocustTimer
+sys.path.append(os.getcwd())  # See "Common libraries" in Locust docs.
+from zk_locust import ZKLocust, ZKLocustTaskSet, LocustTimer
+from zk_metrics import register_zk_metrics_page
 
-import zk_metrics
-zk_metrics.register_page()
+register_zk_metrics_page()
 
 key_size = 8
 val_size = 8
@@ -45,7 +48,7 @@ class SetAndGet(ZKLocust):
 
             try:
                 self._k.create(n, self.next_val(), acl=acl)
-            except kazoo.exceptions.NodeExistsError:
+            except self.client.node_exists_except():
                 pass
 
             self._n = n

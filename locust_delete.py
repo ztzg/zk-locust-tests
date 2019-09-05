@@ -1,10 +1,12 @@
+import sys
+import os
+
 from collections import deque
 
 from locust import task
 
-import kazoo
-
-from common import ZKLocust, ZKLocustTaskSet, LocustTimer
+sys.path.append(os.getcwd())  # See "Common libraries" in Locust docs.
+from zk_locust import ZKLocust, ZKLocustTaskSet, LocustTimer
 
 
 class CreateAndDelete(ZKLocust):
@@ -18,7 +20,7 @@ class CreateAndDelete(ZKLocust):
 
             try:
                 self._k.create('/kx')
-            except kazoo.exceptions.NodeExistsError:
+            except self.client.node_exists_except():
                 pass
 
         @task(100)

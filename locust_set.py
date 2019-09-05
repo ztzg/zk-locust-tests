@@ -1,11 +1,11 @@
 import random
+import sys
 import os
 
 from locust import task
 
-from kazoo.exceptions import NodeExistsError
-
-from common import ZKLocust, ZKLocustTaskSet, LocustTimer
+sys.path.append(os.getcwd())  # See "Common libraries" in Locust docs.
+from zk_locust import ZKLocust, ZKLocustTaskSet, LocustTimer
 
 key_size = int(os.getenv('ZK_LOCUST_KEY_SIZE', '8'))
 val_size = int(os.getenv('ZK_LOCUST_VAL_SIZE', '8'))
@@ -38,7 +38,7 @@ class Set(ZKLocust):
 
             try:
                 self._k.create(n, v)
-            except NodeExistsError:
+            except self.client.node_exists_except():
                 pass
 
             self._n = n
