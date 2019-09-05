@@ -44,7 +44,9 @@ class ZKClient(object):
     def close(self):
         return zookeeper.close(self.handle)
 
-    def create(self, path, data="", flags=0, acl=[ZOO_OPEN_ACL_UNSAFE]):
+    def create(self, path, data="", flags=0, acl=None):
+        if not acl:
+            acl = [ZOO_OPEN_ACL_UNSAFE]
         return zookeeper.create(self.handle, path, data, acl, flags)
 
     def delete(self, path, version=-1):
@@ -68,12 +70,9 @@ class ZKClient(object):
     # def async(self, path="/"):
     #     return zookeeper.async(self.handle, path)
 
-    def acreate(self,
-                path,
-                callback,
-                data="",
-                flags=0,
-                acl=[ZOO_OPEN_ACL_UNSAFE]):
+    def acreate(self, path, callback, data="", flags=0, acl=None):
+        if not acl:
+            acl = [ZOO_OPEN_ACL_UNSAFE]
         return zookeeper.acreate(self.handle, path, data, acl, flags, callback)
 
     def adelete(self, path, callback, version=-1):
