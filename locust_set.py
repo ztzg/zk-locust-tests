@@ -17,7 +17,7 @@ sequential_keys = False
 
 key_seq = 0
 # Note: zkpython does not support binary values!
-v = bytearray(random.randint(32, 127) for _ in range(val_size))
+v = bytes(random.randint(32, 127) for _ in range(val_size))
 
 
 class Set(ZKLocust):
