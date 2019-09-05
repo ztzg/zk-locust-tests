@@ -5,12 +5,10 @@ from locust import task, events
 
 from common import ZKLocust, ZKLocustTaskSet
 
-
 val_size = 8
 
 
 class Watch(ZKLocust):
-
     class task_set(ZKLocustTaskSet):
         def __init__(self, parent):
             super(Watch.task_set, self).__init__(parent)
@@ -35,6 +33,6 @@ class Watch(ZKLocust):
 
             self._k.get(self._n, watch=zk_watch_trigger)
             # Encode start_time as payload.
-            v = int(time.time() * 1000).to_bytes(val_size,
-                                                 byteorder=sys.byteorder)
+            v = int(time.time() * 1000).to_bytes(
+                val_size, byteorder=sys.byteorder)
             self._k.set_async(self._n, v)

@@ -12,15 +12,14 @@ import kazoo.handlers.threading
 import kazoo.client
 import kazoo.exceptions
 
-
 _default_client = os.getenv('ZK_LOCUST_CLIENT', 'kazoo')
 _default_hosts = os.getenv('ZK_LOCUST_HOSTS') or \
     os.getenv('KAZOO_LOCUST_HOSTS')
 _default_pseudo_root = os.getenv('ZK_LOCUST_PSEUDO_ROOT') or \
     os.getenv('KAZOO_LOCUST_PSEUDO_ROOT') or '/kl'
 _default_min_wait = int(os.getenv('ZK_LOCUST_MIN_WAIT', '0'))
-_default_max_wait = max(int(os.getenv('ZK_LOCUST_MAX_WAIT', '0')),
-                        _default_min_wait)
+_default_max_wait = max(
+    int(os.getenv('ZK_LOCUST_MAX_WAIT', '0')), _default_min_wait)
 
 
 class ZKLocustException(Exception):
@@ -31,8 +30,7 @@ class AbstractZKLocustClient(object):
     _pseudo_root = None
     _zk_client = None
 
-    def __init__(self,
-                 pseudo_root=_default_pseudo_root):
+    def __init__(self, pseudo_root=_default_pseudo_root):
         self._pseudo_root = pseudo_root
 
     def _set_zk_client(self, client):
@@ -61,7 +59,6 @@ class AbstractZKLocustClient(object):
 
 # ZKClient backend (libzookeeper_mt.so)
 
-
 ZK_DEFAULT_TIMEOUT = 30000
 ZOO_OPEN_ACL_UNSAFE = {"perms": 0x1f, "scheme": "world", "id": "anyone"}
 
@@ -84,7 +81,7 @@ class ZKClient(object):
 
         self.conn_cv.acquire()
         zookeeper.init(servers, self.connection_watcher, timeout)
-        self.conn_cv.wait(timeout/1000)
+        self.conn_cv.wait(timeout / 1000)
         self.conn_cv.release()
 
         if not self.connected:
@@ -124,10 +121,13 @@ class ZKClient(object):
     # def async(self, path="/"):
     #     return zookeeper.async(self.handle, path)
 
-    def acreate(self, path, callback, data="", flags=0,
+    def acreate(self,
+                path,
+                callback,
+                data="",
+                flags=0,
                 acl=[ZOO_OPEN_ACL_UNSAFE]):
-        return zookeeper.acreate(self.handle, path, data, acl, flags,
-                                 callback)
+        return zookeeper.acreate(self.handle, path, data, acl, flags, callback)
 
     def adelete(self, path, callback, version=-1):
         return zookeeper.adelete(self.handle, path, version, callback)
@@ -227,10 +227,7 @@ class KazooLocustClient(AbstractZKLocustClient):
                     "Unknown value for 'handler': %s" % (handler))
             kwargs['handler'] = inst
 
-        self._set_zk_client(kazoo.client.KazooClient(
-            hosts=hosts,
-            **kwargs
-        ))
+        self._set_zk_client(kazoo.client.KazooClient(hosts=hosts, **kwargs))
 
         self._sasl_options = sasl_options
 
@@ -261,9 +258,7 @@ class KazooLocustClient(AbstractZKLocustClient):
         path = self.join_path('/d-')
         client = self.get_zk_client()
 
-        return client.create(path,
-                             ephemeral=True,
-                             sequence=True)
+        return client.create(path, ephemeral=True, sequence=True)
 
 
 class ZKLocust(Locust):

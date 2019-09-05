@@ -4,7 +4,6 @@ from common import ZKLocust, ZKLocustTaskSet, LocustTimer
 
 
 class ExistsMany(ZKLocust):
-
     class task_set(ZKLocustTaskSet):
         def __init__(self, parent):
             super(ExistsMany.task_set, self).__init__(parent)
@@ -19,6 +18,6 @@ class ExistsMany(ZKLocust):
 
             with LocustTimer('exists_negative_watch') as ctx:
                 self._i += 1
-                self._k.exists('/kl/doesnotexist-' + str(self._i),
-                               watch=zk_watch_trigger)
+                self._k.exists(
+                    '/kl/doesnotexist-' + str(self._i), watch=zk_watch_trigger)
                 ctx.success()

@@ -4,7 +4,6 @@ from common import ZKLocust, ZKLocustTaskSet, LocustTimer
 
 
 class Exists(ZKLocust):
-
     class task_set(ZKLocustTaskSet):
         def __init__(self, parent):
             super(Exists.task_set, self).__init__(parent)

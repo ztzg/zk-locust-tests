@@ -9,7 +9,6 @@ import zookeeper
 
 import kazoo.exceptions
 
-
 key_size = int(os.getenv('ZK_LOCUST_KEY_SIZE', '8'))
 val_size = int(os.getenv('ZK_LOCUST_VAL_SIZE', '8'))
 # rate = 0
@@ -18,14 +17,12 @@ key_space_size = 128
 sequential_keys = False
 # check_hashkv = False
 
-
 key_seq = 0
 # Note: zkpython does not support binary values!
 v = bytearray(random.randint(32, 127) for _ in range(val_size))
 
 
 class Get(ZKLocust):
-
     class task_set(ZKLocustTaskSet):
         def __init__(self, parent):
             super(Get.task_set, self).__init__(parent)

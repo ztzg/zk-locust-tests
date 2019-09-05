@@ -8,7 +8,6 @@ from common import ZKLocust, ZKLocustTaskSet, LocustTimer
 
 
 class CreateAndDelete(ZKLocust):
-
     class task_set(ZKLocustTaskSet):
         _to_delete = deque()
 

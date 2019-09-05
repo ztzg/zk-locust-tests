@@ -6,7 +6,6 @@ import kazoo
 
 from common import ZKLocust, ZKLocustTaskSet, LocustTimer
 
-
 key_size = 8
 val_size = 8
 # rate = 0
@@ -15,12 +14,10 @@ key_space_size = 128
 sequential_keys = False
 # check_hashkv = False
 
-
 key_seq = 0
 
 
 class SetAndGet(ZKLocust):
-
     class task_set(ZKLocustTaskSet):
         _i = 0
 
