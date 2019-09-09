@@ -8,9 +8,9 @@ import kazoo
 
 sys.path.append(os.getcwd())  # See "Common libraries" in Locust docs.
 from zk_locust import ZKLocust, ZKLocustTaskSet, LocustTimer
-from zk_metrics import register_zk_metrics_page
+from zk_metrics import register_zk_metrics
 
-register_zk_metrics_page()
+register_zk_metrics()
 
 key_size = 8
 val_size = 8
