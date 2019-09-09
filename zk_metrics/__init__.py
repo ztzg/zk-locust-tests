@@ -89,12 +89,14 @@ def register_zk_metrics_page(url_prefix='/zk-metrics'):
     # print(app.url_map)
 
 
-def register_zk_metrics(url_prefix='/zk-metrics'):
-    if _zk_metrics_collect == 'web':
+def register_zk_metrics(url_prefix='/zk-metrics',
+                        web=_zk_metrics_collect == 'web',
+                        delay_ms=None):
+    if web:
         register_zk_metrics_page(url_prefix=url_prefix)
     else:
         command = 'monitor'
-        delay_s = int(_zk_metrics_collect) / 1000.0
+        delay_s = (delay_ms or int(_zk_metrics_collect)) / 1000.0
         for zk_host_port in _zk_hosts:
             url = compose_metrics_url(zk_host_port, command)
             gevent.spawn(metrics_collect_loop, zk_host_port, url, delay_s)
