@@ -1,6 +1,10 @@
+import logging
+import os
 import requests
 import re
 import json
+
+import gevent
 
 from flask import Blueprint, render_template, abort, Response
 from jinja2 import TemplateNotFound
@@ -13,16 +17,37 @@ from zk_locust import get_zk_hosts, split_zk_hosts
 from .csv import maybe_write_metrics_csv
 from .defs import metric_defs
 
+_logger = logging.getLogger(__name__)
+
 _zk_hosts = split_zk_hosts(get_zk_hosts())
 _zk_re_port = re.compile(r":\d{1,4}$")
 _zk_metrics_scheme = 'http'
 _zk_metrics_port = 8080
+
+_zk_metrics_collect = os.getenv('ZK_LOCUST_ZK_METRICS_COLLECT', 'web')
 
 _page = Blueprint(
     'zk-metrics',
     __name__,
     template_folder='templates',
     static_folder='static')
+
+
+def compose_metrics_url(zk_host_port, command):
+    host_port = _zk_re_port.sub("", zk_host_port) + ':' + str(_zk_metrics_port)
+    url = _zk_metrics_scheme + '://' + host_port + '/commands/' + command
+    return url
+
+
+def metrics_collect_loop(zk_host_port, url, delay_s):
+    while True:
+        try:
+            r = requests.get(url, allow_redirects=False, stream=False)
+            r.raise_for_status()
+            maybe_write_metrics_csv(zk_host_port, r.content)
+        except requests.exceptions.HTTPError:
+            _logger.exception('Metrics collect loop')
+        gevent.sleep(delay_s)
 
 
 @_page.route('/')
@@ -48,13 +73,13 @@ def proxy(command, index):
     if command != 'monitor' or index < 0 or index >= len(_zk_hosts):
         abort(400)
 
-    host_port = _zk_re_port.sub("", _zk_hosts[index]) + ':' + \
-        str(_zk_metrics_port)
-    url = _zk_metrics_scheme + '://' + host_port + '/commands/' + command
+    zk_host_port = _zk_hosts[index]
+    url = compose_metrics_url(zk_host_port, command)
 
     r = requests.get(url, allow_redirects=False, stream=False)
 
-    maybe_write_metrics_csv(host_port, r.content)
+    if (r.status_code == 200):
+        maybe_write_metrics_csv(zk_host_port, r.content)
 
     return Response(r.content, r.status_code, [])
 
@@ -62,3 +87,14 @@ def proxy(command, index):
 def register_zk_metrics_page(url_prefix='/zk-metrics'):
     app.register_blueprint(_page, url_prefix=url_prefix)
     # print(app.url_map)
+
+
+def register_zk_metrics(url_prefix='/zk-metrics'):
+    if _zk_metrics_collect == 'web':
+        register_zk_metrics_page(url_prefix=url_prefix)
+    else:
+        command = 'monitor'
+        delay_s = int(_zk_metrics_collect) / 1000.0
+        for zk_host_port in _zk_hosts:
+            url = compose_metrics_url(zk_host_port, command)
+            gevent.spawn(metrics_collect_loop, zk_host_port, url, delay_s)
