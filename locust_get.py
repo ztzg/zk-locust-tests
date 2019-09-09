@@ -6,8 +6,10 @@ from locust import task
 
 sys.path.append(os.getcwd())  # See "Common libraries" in Locust docs.
 from zk_locust import ZKLocust, ZKLocustTaskSet, LocustTimer
+from locust_extra.stats import register_extra_stats
 from zk_metrics import register_zk_metrics
 
+register_extra_stats()
 register_zk_metrics()
 
 key_size = int(os.getenv('ZK_LOCUST_KEY_SIZE', '8'))
