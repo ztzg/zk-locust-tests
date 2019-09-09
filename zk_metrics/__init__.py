@@ -1,5 +1,6 @@
 import requests
 import re
+import json
 
 from flask import Blueprint, render_template, abort, Response
 from jinja2 import TemplateNotFound
@@ -10,6 +11,7 @@ from locust.web import app
 from zk_locust import get_zk_hosts, split_zk_hosts
 
 from .csv import maybe_write_metrics_csv
+from .defs import metric_defs
 
 _zk_hosts = split_zk_hosts(get_zk_hosts())
 _zk_re_port = re.compile(r":\d{1,4}$")
@@ -24,7 +26,7 @@ _page = Blueprint(
 
 
 @_page.route('/')
-def show():
+def ui():
     try:
         return render_template(
             'zk_metrics.html',
@@ -32,6 +34,13 @@ def show():
             zk_locust_hosts=','.join(_zk_hosts))
     except TemplateNotFound:
         abort(404)
+
+
+@_page.route('/defs.js')
+def defs():
+    s = json.dumps(metric_defs, ensure_ascii=True)
+
+    return 'loadServerMetricDefinitions(' + s + ')'
 
 
 @_page.route('/proxy/<command>/<int:index>')
