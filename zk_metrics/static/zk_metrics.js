@@ -1,4 +1,23 @@
-var serverMetrics = [
+var serverMetrics_3_5 = [
+  // Via MonitorCommand in Commands.java.
+  { name: "latency", kind: "Summary (Basic)" },
+
+  { name: "packets_received", kind: "Counter" },
+  { name: "packets_sent", kind: "Counter" },
+  { name: "num_alive_connections", kind: "Gauge" },
+  { name: "outstanding_requests", kind: "Gauge" },
+  { name: "znode_count", kind: "Gauge" },
+  { name: "watch_count", kind: "Gauge" },
+  { name: "ephemerals_count", kind: "Gauge" },
+  { name: "approximate_data_size", kind: "Gauge" },
+  { name: "open_file_descriptor_count", kind: "Gauge" },
+  { name: "max_file_descriptor_count", kind: "Gauge" },
+  { name: "last_client_response_size", kind: "Gauge" },
+  { name: "max_client_response_size", kind: "Gauge" },
+  { name: "min_client_response_size", kind: "Gauge" }
+];
+
+var serverMetrics_3_6 = [
   // Via registerGauge in ZooKeeperServer.java; tweaked.
   { name: "latency", kind: "Summary (Basic)" },
 
@@ -139,6 +158,9 @@ var serverMetrics = [
   { name: "netty_queued_buffer_capacity", kind: "Summary (Basic)" },
   { name: "digest_mismatches_count", kind: "Counter" }
 ];
+
+// We don't know which server we are targeting yet.
+var serverMetrics = [];
 
 $("ul.tabs")
   .tabs("div.panes > div")
@@ -410,11 +432,21 @@ function collectAdvancedSummarySetValues(name, entries, reports, collector) {
   );
 }
 
+function getServerMetricDefinitions(reports) {
+  function looksLike_3_6(report) {
+    return report["snap_count"] != null;
+  }
+
+  if (reports.some(looksLike_3_6)) {
+    return serverMetrics_3_6;
+  } else {
+    return serverMetrics_3_5;
+  }
+}
+
 var metricsTemplate = $("#metrics-template");
 
-function updateMetricsTable() {
-  var metrics = serverMetrics;
-
+function updateMetricsTable(metrics) {
   var metricLookup = {};
   metrics.forEach(function(metric) {
     metricLookup[metric.name] = metric;
@@ -444,8 +476,6 @@ function updateMetricsTable() {
     }
   });
 }
-
-updateMetricsTable();
 
 var statsHeaderTemplate = $("#stats-header-template");
 var statsTemplate = $("#stats-template");
@@ -482,6 +512,11 @@ function updateStatsTable(targets, reports) {
         )
       );
     }
+  }
+
+  if (!serverMetrics.length) {
+    serverMetrics = getServerMetricDefinitions(reports);
+    updateMetricsTable(serverMetrics);
   }
 
   serverMetrics.forEach(function(metric) {
