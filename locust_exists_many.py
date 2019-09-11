@@ -1,18 +1,12 @@
-from zk_locust import ZKLocust, ZKLocustTaskSet
+from zk_locust import ZKLocust
 from locust_extra.stats import register_extra_stats
 from zk_metrics import register_zk_metrics
 
-from zk_locust.ops import ZKExistsOp, ZKExistsWithManyWatchesOp
+from zk_locust.task_sets import ZKExistsManyTaskSet
 
 register_extra_stats()
 register_zk_metrics()
 
 
 class ExistsMany(ZKLocust):
-    class task_set(ZKLocustTaskSet):
-        def __init__(self, parent):
-            super(ExistsMany.task_set, self).__init__(parent)
-
-            op = ZKExistsWithManyWatchesOp(self.client)
-
-            self.tasks = [op.task]
+    task_set = ZKExistsManyTaskSet
