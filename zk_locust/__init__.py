@@ -64,6 +64,11 @@ class ZKLocust(Locust):
 
 
 class ZKLocustTaskSet(TaskSet):
+    def __init__(self, parent, maybe_interrupt=None, *args, **kwargs):
+        super(ZKLocustTaskSet, self).__init__(parent, *args, **kwargs)
+
+        self.maybe_interrupt = maybe_interrupt
+
     def on_stop(self):
         # super?
         if isinstance(self.parent, ZKLocust):
@@ -71,6 +76,11 @@ class ZKLocustTaskSet(TaskSet):
 
 
 class ZKLocustTaskSequence(TaskSequence):
+    def __init__(self, parent, maybe_interrupt=None, *args, **kwargs):
+        super(ZKLocustTaskSequence, self).__init__(parent, *args, **kwargs)
+
+        self.maybe_interrupt = maybe_interrupt
+
     def on_stop(self):
         # super?
         if isinstance(self.parent, ZKLocust):
