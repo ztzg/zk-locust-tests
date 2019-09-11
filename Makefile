@@ -1,6 +1,6 @@
 # TODO(ddiederen): connect doesn't play well with greenlet exists.
 TESTS =						\
-	delete					\
+	create_and_delete			\
 	exists_many				\
 	exists					\
 	get_children2				\
@@ -25,7 +25,6 @@ run: $(addprefix $(OUT)/,$(addsuffix .log,$(TESTS)))
 .PRECIOUS: $(OUT)/%.log
 $(OUT)/%.log:					\
 		locust_%.py			\
-		common.py			\
 		multi-locust.sh
 	@mkdir -p $(TMP)/$* $(OUT)
 	bash multi-locust.sh $(MULTI_COUNT) $(TMP)/$*			\
