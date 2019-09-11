@@ -37,20 +37,23 @@ class ZKLocust(Locust):
     min_wait = MIN_WAIT
     max_wait = MAX_WAIT
 
-    def __init__(self, client_impl=CLIENT_IMPL):
+    def __init__(self,
+                 client_impl=CLIENT_IMPL,
+                 pseudo_root=PSEUDO_ROOT,
+                 **kwargs):
         super(ZKLocust, self).__init__()
 
         hosts = get_zk_hosts()
-        pseudo_root = PSEUDO_ROOT
 
         if client_impl == 'kazoo':
             from .backend_kazoo import KazooLocustClient, KAZOO_EXCEPTIONS
             self.client = KazooLocustClient(
-                hosts=hosts, pseudo_root=pseudo_root)
+                hosts=hosts, pseudo_root=pseudo_root, **kwargs)
             register_exceptions(KAZOO_EXCEPTIONS)
         elif client_impl == 'zkpython':
             from .backend_zkpython import ZKLocustClient, ZKPYTHON_EXCEPTIONS
-            self.client = ZKLocustClient(hosts=hosts, pseudo_root=pseudo_root)
+            self.client = ZKLocustClient(
+                hosts=hosts, pseudo_root=pseudo_root, **kwargs)
             register_exceptions(ZKPYTHON_EXCEPTIONS)
         else:
             raise ZKLocustException(
