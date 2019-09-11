@@ -92,7 +92,8 @@ class KazooLocustClient(AbstractZKLocustClient):
         self.ensure_pseudo_root()
 
     def stop(self):
-        self.get_zk_client().stop()
+        if self._started:
+            super(KazooLocustClient, self).get_zk_client().stop()
         self._started = False
 
     def has_sasl_auth(self):
