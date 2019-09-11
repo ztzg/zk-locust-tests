@@ -1,73 +1,21 @@
-import random
-import sys
-import os
-
-from locust import task
-
-import kazoo
-
-sys.path.append(os.getcwd())  # See "Common libraries" in Locust docs.
-from zk_locust import ZKLocust, ZKLocustTaskSet, LocustTimer
+from zk_locust import ZKLocust, ZKLocustTaskSet
+from locust_extra.stats import register_extra_stats
 from zk_metrics import register_zk_metrics
 
+from zk_locust.ops import ZKIncrementingSetOp, ZKGetOp
+
+register_extra_stats()
 register_zk_metrics()
-
-key_size = 8
-val_size = 8
-# rate = 0
-# total = 10000
-key_space_size = 128
-sequential_keys = False
-# check_hashkv = False
-
-key_seq = 0
 
 
 class SetAndGet(ZKLocust):
     class task_set(ZKLocustTaskSet):
-        _i = 0
-
         def __init__(self, parent):
             super(SetAndGet.task_set, self).__init__(parent)
 
-            self._k = self.client.get_zk_client()
+            set_op = ZKIncrementingSetOp(self.client)
+            get_op = ZKGetOp(self.client)
 
-            if (sequential_keys):
-                global key_seq
-                key_i = key_seq % key_space_size
-                key_seq += 1
-            else:
-                key_i = random.randrange(0, key_space_size)
-
-            n = self.client.join_path('/c-' + str(key_i).zfill(key_size - 2))
-
-            acl = None
-            if (self.client.has_sasl_auth()):
-                # "auth"
-                acl = kazoo.security.CREATOR_ALL_ACL
-
-            try:
-                self._k.create(n, self.next_val(), acl=acl)
-            except self.client.node_exists_except():
-                pass
-
-            self._n = n
-
-        def next_val(self):
-            v = str(self._i).zfill(val_size).encode('ascii')
-            self._i += 1
-            return v
-
-        @task(1)
-        def zk_set(self):
-            v = self.next_val()
-
-            with LocustTimer('set') as ctx:
-                self._k.set(self._n, v)
-                ctx.success()
-
-        @task(10)
-        def zk_get(self):
-            with LocustTimer('get') as ctx:
-                v = self._k.get(self._n)
-                ctx.success(response_length=len(v))
+            # KLUDGE: Locust's dictionary approach does not work with
+            # constructors.
+            self.tasks = [set_op.task] + [get_op.task for i in range(10)]

@@ -1,10 +1,11 @@
-import sys
-import os
+from zk_locust import ZKLocust, ZKLocustTaskSet
+from locust_extra.stats import register_extra_stats
+from zk_metrics import register_zk_metrics
 
-from locust import task
+from zk_locust.ops import ZKExistsOp, ZKExistsWithWatchOp
 
-sys.path.append(os.getcwd())  # See "Common libraries" in Locust docs.
-from zk_locust import ZKLocust, ZKLocustTaskSet, LocustTimer
+register_extra_stats()
+register_zk_metrics()
 
 
 class Exists(ZKLocust):
@@ -12,38 +13,15 @@ class Exists(ZKLocust):
         def __init__(self, parent):
             super(Exists.task_set, self).__init__(parent)
 
-            self._k = self.client.get_zk_client()
-            self._n = self.client.create_default_node()
+            good_path = self.client.create_default_node()
+            bad_path = self.client.join_path('/doesnotexist')
 
-        def teardown(self):
-            self.client.stop()
+            pos_op = ZKExistsOp(self.client, good_path, 'exists_positive')
+            neg_op = ZKExistsOp(self.client, bad_path, 'exists_negative')
 
-        @task
-        def zk_exists_positive(self):
-            with LocustTimer('exists_positive') as ctx:
-                self._k.exists(self._n)
-                ctx.success()
+            posw_op = ZKExistsWithWatchOp(self.client, good_path,
+                                          'exists_positive_watch')
+            negw_op = ZKExistsWithWatchOp(self.client, bad_path,
+                                          'exists_negative_watch')
 
-        @task
-        def zk_exists_negative(self):
-            with LocustTimer('exists_negative') as ctx:
-                self._k.exists('/kl/doesnotexist')
-                ctx.success()
-
-        @task
-        def zk_exists_positive_watch(self):
-            def zk_watch_trigger(event):
-                pass
-
-            with LocustTimer('exists_positive_watch') as ctx:
-                self._k.exists(self._n, watch=zk_watch_trigger)
-                ctx.success()
-
-        @task
-        def zk_exists_negative_watch(self):
-            def zk_watch_trigger(event):
-                pass
-
-            with LocustTimer('exists_negative_watch') as ctx:
-                self._k.exists('/kl/doesnotexist', watch=zk_watch_trigger)
-                ctx.success()
+            self.tasks = [pos_op.task, neg_op.task, posw_op.task, negw_op.task]

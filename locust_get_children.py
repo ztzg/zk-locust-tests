@@ -1,10 +1,11 @@
-import sys
-import os
+from zk_locust import ZKLocust, ZKLocustTaskSet
+from locust_extra.stats import register_extra_stats
+from zk_metrics import register_zk_metrics
 
-from locust import task
+from zk_locust.ops import ZKGetChildrenOp
 
-sys.path.append(os.getcwd())  # See "Common libraries" in Locust docs.
-from zk_locust import ZKLocust, ZKLocustTaskSet, LocustTimer
+register_extra_stats()
+register_zk_metrics()
 
 
 class GetChildren(ZKLocust):
@@ -12,11 +13,9 @@ class GetChildren(ZKLocust):
         def __init__(self, parent):
             super(GetChildren.task_set, self).__init__(parent)
 
-            self._k = self.client.get_zk_client()
-            self._n = self.client.create_default_node()
+            path = self.client.join_path('/')
+            self.client.create_default_node()
 
-        @task
-        def zk_get_children(self):
-            with LocustTimer('get_children') as ctx:
-                c = self._k.get_children('/kl')
-                ctx.success(len(c))
+            op = ZKGetChildrenOp(self.client, path)
+
+            self.tasks = [op.task]

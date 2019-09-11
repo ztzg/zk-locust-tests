@@ -1,10 +1,11 @@
-import sys
-import os
+from zk_locust import ZKLocust, ZKLocustTaskSet
+from locust_extra.stats import register_extra_stats
+from zk_metrics import register_zk_metrics
 
-from locust import task
+from zk_locust.ops import ZKExistsOp, ZKExistsWithManyWatchesOp
 
-sys.path.append(os.getcwd())  # See "Common libraries" in Locust docs.
-from zk_locust import ZKLocust, ZKLocustTaskSet, LocustTimer
+register_extra_stats()
+register_zk_metrics()
 
 
 class ExistsMany(ZKLocust):
@@ -12,16 +13,6 @@ class ExistsMany(ZKLocust):
         def __init__(self, parent):
             super(ExistsMany.task_set, self).__init__(parent)
 
-            self._k = self.client.get_zk_client()
-            self._i = 0
+            op = ZKExistsWithManyWatchesOp(self.client)
 
-        @task
-        def zk_exists_negative_watch(self):
-            def zk_watch_trigger(event):
-                pass
-
-            with LocustTimer('exists_negative_watch') as ctx:
-                self._i += 1
-                self._k.exists(
-                    '/kl/doesnotexist-' + str(self._i), watch=zk_watch_trigger)
-                ctx.success()
+            self.tasks = [op.task]
