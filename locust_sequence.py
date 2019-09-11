@@ -1,5 +1,10 @@
 from datetime import timedelta
 
+import gevent
+from gevent import GreenletExit
+
+import locust.runners
+
 from zk_locust import ZKLocust, ZKLocustTaskSequence
 from locust_extra.stats import register_extra_stats
 from zk_metrics import register_zk_metrics
@@ -9,6 +14,18 @@ from zk_locust.task_sets import ZKConnectTaskSet, ZKSetTaskSet, ZKGetTaskSet, ZK
 
 register_extra_stats()
 register_zk_metrics()
+
+
+def startup(*args, **kwargs):
+    gevent.sleep(10)
+
+
+def shutdown(*args, **kwargs):
+    if False:
+        locust_runner = locust.runners.locust_runner
+        locust_runner.quit()
+    else:
+        raise GreenletExit()
 
 
 class Sequence(ZKLocust):
@@ -53,7 +70,7 @@ class Sequence(ZKLocust):
                     task_set, maybe_interrupt=duration(s)).run()
 
             self.tasks = [
-                run_set, run_get, run_set_and_get, run_create_and_delete,
-                run_watch, run_exists, run_exists_many, run_get_children,
-                run_get_children2
+                startup, run_set, run_get, run_set_and_get,
+                run_create_and_delete, run_watch, run_exists, run_exists_many,
+                run_get_children, run_get_children2, shutdown
             ]
