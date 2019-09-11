@@ -79,11 +79,27 @@ def _create_random_key(client, key_size, sequential_keys, key_space_size,
 class AbstractOp(object):
     def __init__(self, client, maybe_interrupt=None):
         self.client = client
-        self.maybe_interrupt = maybe_interrupt
+        self._maybe_interrupt = maybe_interrupt
+        self._task_set = None
+        self._tick = None
 
     def task(self, task_set):
-        if self.maybe_interrupt is not None:
-            self.maybe_interrupt(task_set)
+        if task_set is not self._task_set:
+            self._task_set = task_set
+            opmi = self._maybe_interrupt
+            if hasattr(task_set, "maybe_interrupt"):
+                tsmi = task_set.maybe_interrupt
+            if tsmi and opmi:
+
+                def both(task_set):
+                    opmi(task_set)
+                    tsmi(task_set)
+
+                self._tick = both
+            else:
+                self._tick = opmi or tsmi
+        if self._tick:
+            self._tick(task_set)
         self.op()
 
 
