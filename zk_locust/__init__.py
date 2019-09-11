@@ -2,7 +2,7 @@ import time
 import re
 import os
 
-from locust import Locust, TaskSet, events
+from locust import Locust, TaskSet, TaskSequence, events
 
 from .backend_base import ZKLocustException
 
@@ -64,6 +64,13 @@ class ZKLocust(Locust):
 
 
 class ZKLocustTaskSet(TaskSet):
+    def on_stop(self):
+        # super?
+        if isinstance(self.parent, ZKLocust):
+            self.parent.stop()
+
+
+class ZKLocustTaskSequence(TaskSequence):
     def on_stop(self):
         # super?
         if isinstance(self.parent, ZKLocust):
