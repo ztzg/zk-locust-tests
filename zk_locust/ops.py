@@ -11,8 +11,8 @@ from locust import Locust, TaskSet, events
 
 from . import LocustTimer
 
-_default_key_size = int(os.getenv('ZK_LOCUST_KEY_SIZE', '8'))
-_default_val_size = int(os.getenv('ZK_LOCUST_VAL_SIZE', '8'))
+_default_key_size = int(os.getenv('ZK_LOCUST_KEY_SIZE') or '8')
+_default_val_size = int(os.getenv('ZK_LOCUST_VAL_SIZE') or '8')
 
 key_seq = 0
 
@@ -58,6 +58,8 @@ def _gen_test_path(client, key_size, sequential_keys, key_space_size):
 
 
 def _gen_random_bytes(val_size):
+    if val_size is None:
+        val_size = _default_val_size
     # Note: zkpython does not support binary values!
     return bytes(random.randint(32, 127) for _ in range(val_size))
 
@@ -141,7 +143,7 @@ class ZKGetOp(AbstractSingleTimerOp):
                  sequential_keys=False,
                  key_space_size=128,
                  key_size=_default_key_size,
-                 val_size=_default_val_size,
+                 val_size=None,
                  **kwargs):
         super(ZKGetOp, self).__init__(
             client, request_type=request_type, **kwargs)
@@ -166,7 +168,7 @@ class ZKSetOp(AbstractSingleTimerOp):
                  sequential_keys=False,
                  key_space_size=128,
                  key_size=_default_key_size,
-                 val_size=_default_val_size,
+                 val_size=None,
                  **kwargs):
         super(ZKSetOp, self).__init__(
             client, request_type=request_type, **kwargs)
@@ -192,7 +194,7 @@ class ZKIncrementingSetOp(AbstractSingleTimerOp):
                  sequential_keys=False,
                  key_space_size=128,
                  key_size=_default_key_size,
-                 val_size=_default_val_size,
+                 val_size=None,
                  **kwargs):
         super(ZKIncrementingSetOp, self).__init__(
             client, request_type=request_type, **kwargs)
@@ -202,7 +204,7 @@ class ZKIncrementingSetOp(AbstractSingleTimerOp):
 
         self._n = n
         self._i = 0
-        self._val_size = val_size
+        self._val_size = val_size or _default_val_size
 
         v = self.next_val()
 
@@ -230,6 +232,7 @@ class ZKCreateEphemeralOp(AbstractSingleTimerOp):
                  *,
                  request_type='create_ephemeral',
                  base_path=None,
+                 val_size=None,
                  push=None,
                  **kwargs):
         super(ZKCreateEphemeralOp, self).__init__(
@@ -240,12 +243,14 @@ class ZKCreateEphemeralOp(AbstractSingleTimerOp):
 
         self._k = client.get_zk_client()
         self._base_path = base_path
+        self._v = _gen_random_bytes(val_size)
         self._push = push
 
     def op(self):
         k = None
         with self.timing() as ctx:
-            k = self._k.create(self._base_path, ephemeral=True, sequence=True)
+            k = self._k.create(
+                self._base_path, self._v, ephemeral=True, sequence=True)
             ctx.success()
         if k and self._push:
             self._push(k)
@@ -392,7 +397,7 @@ class ZKWatchOp(AbstractOp):
                  *,
                  request_type='watch',
                  task_set_name='',
-                 val_size=_default_val_size,
+                 val_size=None,
                  **kwargs):
         super(ZKWatchOp, self).__init__(client, **kwargs)
 
@@ -400,7 +405,7 @@ class ZKWatchOp(AbstractOp):
         self._request_type = request_type
         self._task_set_name = task_set_name
         self._path = path
-        self._val_size = val_size
+        self._val_size = val_size or _default_val_size
 
     def op(self):
         def zk_watch_trigger(event):
