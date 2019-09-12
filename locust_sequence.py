@@ -18,6 +18,9 @@ from zk_locust.task_sets import ZKConnectTaskSet, ZKSetTaskSet, ZKGetTaskSet, ZK
 register_extra_stats()
 register_zk_metrics()
 
+# _bench_val_sizes = [None]
+_bench_val_sizes = [8, 512, 8 * 1024]
+
 _num_clients = None
 
 
@@ -63,28 +66,59 @@ def barrier_wrap(task):
     return fn
 
 
+def gen_val_size_tasks(s, val_size):
+    suffix = None
+
+    if val_size:
+        if val_size >= 1024:
+            suffix = '%s_KiB' % round(val_size / 1024, 3)
+        else:
+            suffix = '%s_B' % val_size
+
+    def run_set(task_set):
+        ZKSetTaskSet(
+            task_set,
+            suffix=suffix,
+            val_size=val_size,
+            maybe_interrupt=duration(s)).run()
+
+    def run_get(task_set):
+        ZKGetTaskSet(
+            task_set,
+            suffix=suffix,
+            val_size=val_size,
+            maybe_interrupt=duration(s)).run()
+
+    def run_set_and_get(task_set):
+        ZKSetAndGetTaskSet(
+            task_set,
+            suffix=suffix,
+            val_size=val_size,
+            maybe_interrupt=duration(s)).run()
+
+    def run_create_and_delete(task_set):
+        ZKCreateAndDeleteTaskSet(
+            task_set,
+            suffix=suffix,
+            val_size=val_size,
+            maybe_interrupt=duration(s)).run()
+
+    return [run_set, run_get, run_set_and_get, run_create_and_delete]
+
+
 class Sequence(ZKLocust):
     class task_set(ZKLocustTaskSequence):
         def __init__(self, parent):
             super(Sequence.task_set, self).__init__(parent)
 
             s = timedelta(seconds=5)
+            tasks = []
 
             def run_connect(task_set):
                 ZKConnectTaskSet(task_set, maybe_interrupt=duration(s)).run()
 
-            def run_set(task_set):
-                ZKSetTaskSet(task_set, maybe_interrupt=duration(s)).run()
-
-            def run_get(task_set):
-                ZKGetTaskSet(task_set, maybe_interrupt=duration(s)).run()
-
-            def run_set_and_get(task_set):
-                ZKSetAndGetTaskSet(task_set, maybe_interrupt=duration(s)).run()
-
-            def run_create_and_delete(task_set):
-                ZKCreateAndDeleteTaskSet(
-                    task_set, maybe_interrupt=duration(s)).run()
+            for val_size in _bench_val_sizes:
+                tasks += gen_val_size_tasks(s, val_size)
 
             def run_watch(task_set):
                 ZKWatchTaskSet(task_set, maybe_interrupt=duration(s)).run()
@@ -104,8 +138,7 @@ class Sequence(ZKLocust):
                 ZKGetChildren2TaskSet(
                     task_set, maybe_interrupt=duration(s)).run()
 
-            tasks = [
-                run_set, run_get, run_set_and_get, run_create_and_delete,
+            tasks += [
                 run_watch, run_exists, run_exists_many, run_get_children,
                 run_get_children2
             ]
