@@ -14,29 +14,30 @@ class ZKConnectTaskSet(ZKLocustTaskSet):
 
 
 class ZKSetTaskSet(ZKLocustTaskSet):
-    def __init__(self, parent, *, name='set', **kwargs):
+    def __init__(self, parent, *, name='set', val_size=None, **kwargs):
         super(ZKSetTaskSet, self).__init__(parent, **kwargs)
 
-        op = ZKSetOp(self.client, task_set_name=name)
+        op = ZKSetOp(self.client, task_set_name=name, val_size=val_size)
 
         self.tasks = [op.task]
 
 
 class ZKGetTaskSet(ZKLocustTaskSet):
-    def __init__(self, parent, *, name='get', **kwargs):
+    def __init__(self, parent, *, name='get', val_size=None, **kwargs):
         super(ZKGetTaskSet, self).__init__(parent, **kwargs)
 
-        op = ZKGetOp(self.client, task_set_name=name)
+        op = ZKGetOp(self.client, task_set_name=name, val_size=val_size)
 
         self.tasks = [op.task]
 
 
 class ZKSetAndGetTaskSet(ZKLocustTaskSet):
-    def __init__(self, parent, *, name='set_and_get', **kwargs):
+    def __init__(self, parent, *, name='set_and_get', val_size=None, **kwargs):
         super(ZKSetAndGetTaskSet, self).__init__(parent, **kwargs)
 
-        set_op = ZKIncrementingSetOp(self.client, task_set_name=name)
-        get_op = ZKGetOp(self.client, task_set_name=name)
+        set_op = ZKIncrementingSetOp(
+            self.client, task_set_name=name, val_size=val_size)
+        get_op = ZKGetOp(self.client, task_set_name=name, val_size=val_size)
 
         # KLUDGE: Locust's dictionary approach does not work with
         # constructors.
@@ -44,13 +45,21 @@ class ZKSetAndGetTaskSet(ZKLocustTaskSet):
 
 
 class ZKCreateAndDeleteTaskSet(ZKLocustTaskSet):
-    def __init__(self, parent, *, name='create_and_delete', **kwargs):
+    def __init__(self,
+                 parent,
+                 *,
+                 name='create_and_delete',
+                 val_size=None,
+                 **kwargs):
         super(ZKCreateAndDeleteTaskSet, self).__init__(parent, **kwargs)
 
         do_delete = deque()
 
         create_op = ZKCreateEphemeralOp(
-            self.client, push=do_delete.append, task_set_name=name)
+            self.client,
+            push=do_delete.append,
+            task_set_name=name,
+            val_size=val_size)
         delete_op = ZKDeleteFromQueueOp(
             self.client, pop=do_delete.popleft, task_set_name=name)
         count_op = ZKCountChildrenOp(self.client, task_set_name=name)
