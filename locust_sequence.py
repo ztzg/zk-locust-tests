@@ -1,3 +1,5 @@
+import os
+
 from datetime import timedelta
 
 import gevent
@@ -17,6 +19,11 @@ from zk_locust.task_sets import ZKConnectTaskSet, ZKSetTaskSet, ZKGetTaskSet, ZK
 
 register_extra_stats()
 register_zk_metrics()
+
+_bench_repetitions = int(os.getenv('ZK_LOCUST_BENCH_REPETITIONS') or '1')
+_bench_step_duration = float(
+    os.getenv('ZK_LOCUST_BENCH_STEP_DURATION') or '10')
+_bench_barrier_path = os.getenv('ZK_LOCUST_BENCH_BARRIER_PATH', '/kl_barrier')
 
 # _bench_val_sizes = [None]
 _bench_val_sizes = [8, 512, 8 * 1024]
@@ -44,8 +51,6 @@ def on_hatch_complete(user_count):
 
 events.hatch_complete += on_hatch_complete
 
-_barrier_path = '/locust_sequence'
-
 
 def barrier_wrap(task):
     def fn(task_set):
@@ -54,7 +59,7 @@ def barrier_wrap(task):
         # Should we use another client?  (Possibly targeting another
         # ensemble!)
         zk_client = task_set.client.get_zk_client()
-        barrier = DoubleBarrier(zk_client, _barrier_path, _num_clients)
+        barrier = DoubleBarrier(zk_client, _bench_barrier_path, _num_clients)
         barrier.enter()
         try:
             gevent.sleep(0.5)
@@ -111,7 +116,7 @@ class Sequence(ZKLocust):
         def __init__(self, parent):
             super(Sequence.task_set, self).__init__(parent)
 
-            s = timedelta(seconds=5)
+            s = timedelta(seconds=_bench_step_duration)
             tasks = []
 
             def run_connect(task_set):
@@ -143,7 +148,9 @@ class Sequence(ZKLocust):
                 run_get_children2
             ]
 
-            if _barrier_path:
+            if _bench_barrier_path:
                 tasks = [barrier_wrap(task) for task in tasks]
+
+            tasks *= _bench_repetitions
 
             self.tasks = [startup] + tasks + [shutdown]
