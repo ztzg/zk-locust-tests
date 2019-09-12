@@ -40,6 +40,13 @@ set_var() {
     eval "export $prefix$key=${value@Q}"
 }
 
+die() {
+    echo "*** ERROR ***: $*" >&2
+    exit 1
+}
+
+# Argument handling.
+
 dashdash=
 multi_count=
 multi_workdir=
@@ -70,23 +77,57 @@ while [ -z "$dashdash" -a "$#" -gt '0' ]; do
             multi_workdir="$2"
             shift 2
             ;;
+        --report-dir)
+            report_dir="$2"
+            shift 2
+            ;;
         --)
             dashdash="$1"
             shift
             ;;
         *)
-            echo "Unrecognized argument '$1'; aborting.  (Tail: $*)" >&2
-            exit 1
+            die "Unrecognized argument '$1'; aborting.  (Tail: $*)"
             ;;
     esac
 done
 
+# Report directory setup.
+
+if [ -n "$report_dir" ]; then
+    if [ -d "$report_dir" ]; then
+        die "Refusing to touch existing report directory '$report_dir'."
+    fi
+
+    mkdir -p "$report_dir"
+    report_dir="$(cd "$report_dir"; pwd)"
+
+    if [ -z "$ZK_LOCUST_ZK_METRICS_CSV" ]; then
+        export ZK_LOCUST_ZK_METRICS_CSV="$report_dir/zk-metrics.csv"
+    fi
+    if [ -z "$LOCUST_EXTRA_STATS_CSV" ]; then
+        export LOCUST_EXTRA_STATS_CSV="$report_dir/locust-stats.csv"
+    fi
+fi
+
+# Locust invocation.
+
 if [ -z "$multi_count" ]; then
-    exec locust "$@"
+    locust "$@"
 else
     if [ -z "$multi_workdir" ]; then
         multi_workdir="$(mktemp -d)"
         trap "rm -rf '$multi_workdir'" EXIT
     fi
     "$ZK_LOCUST_TESTS/multi-locust.sh" "$multi_count" "$multi_workdir" "$@"
+fi
+
+# Report generation.
+
+if [ -d "$report_dir" ]; then
+    make --no-print-directory \
+        -C "$report_dir" \
+        -f "$ZK_LOCUST_TESTS/report/report.mk" \
+        LOCUST_EXTRA_STATS_CSV="$LOCUST_EXTRA_STATS_CSV" \
+        ZK_LOCUST_ZK_METRICS_CSV="$ZK_LOCUST_ZK_METRICS_CSV" \
+        report
 fi
