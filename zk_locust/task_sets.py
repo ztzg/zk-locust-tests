@@ -36,7 +36,7 @@ class ZKSetAndGetTaskSet(ZKLocustTaskSet):
         super(ZKSetAndGetTaskSet, self).__init__(*args, **kwargs)
 
         set_op = ZKIncrementingSetOp(self.client)
-        get_op = ZKGetOp(self.client, label='get_incr_set')
+        get_op = ZKGetOp(self.client, request_type='get_incr_set')
 
         # KLUDGE: Locust's dictionary approach does not work with
         # constructors.
@@ -79,13 +79,15 @@ class ZKExistsTaskSet(ZKLocustTaskSet):
         good_path = self.client.create_default_node()
         bad_path = self.client.join_path('/doesnotexist')
 
-        pos_op = ZKExistsOp(self.client, good_path, 'exists_positive')
-        neg_op = ZKExistsOp(self.client, bad_path, 'exists_negative')
+        pos_op = ZKExistsOp(
+            self.client, good_path, request_type='exists_positive')
+        neg_op = ZKExistsOp(
+            self.client, bad_path, request_type='exists_negative')
 
-        posw_op = ZKExistsWithWatchOp(self.client, good_path,
-                                      'exists_positive_watch')
-        negw_op = ZKExistsWithWatchOp(self.client, bad_path,
-                                      'exists_negative_watch')
+        posw_op = ZKExistsWithWatchOp(
+            self.client, good_path, request_type='exists_positive_watch')
+        negw_op = ZKExistsWithWatchOp(
+            self.client, bad_path, request_type='exists_negative_watch')
 
         self.tasks = [pos_op.task, neg_op.task, posw_op.task, negw_op.task]
 

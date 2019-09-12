@@ -77,7 +77,7 @@ def _create_random_key(client, key_size, sequential_keys, key_space_size,
 
 
 class AbstractOp(object):
-    def __init__(self, client, maybe_interrupt=None):
+    def __init__(self, client, *, maybe_interrupt=None):
         self.client = client
         self._maybe_interrupt = maybe_interrupt
         self._task_set = None
@@ -103,52 +103,73 @@ class AbstractOp(object):
         self.op()
 
 
-class ZKConnectOp(AbstractOp):
-    def __init__(self, client, maybe_interrupt=None):
-        super(ZKConnectOp, self).__init__(client, maybe_interrupt)
+class AbstractSingleTimerOp(AbstractOp):
+    def __init__(self,
+                 client,
+                 *,
+                 request_type=None,
+                 task_set_name=None,
+                 **kwargs):
+        super(AbstractSingleTimerOp, self).__init__(client, **kwargs)
+        self._request_type = request_type
+        self._task_set_name = task_set_name
+
+    def timing(self, request_type=None, task_set_name=None):
+        return LocustTimer(
+            request_type=request_type or self._request_type or '',
+            name=task_set_name or self._task_set_name or '')
+
+
+class ZKConnectOp(AbstractSingleTimerOp):
+    def __init__(self, *args, **kwargs):
+        super(ZKConnectOp, self).__init__(*args, **kwargs)
 
     def op(self):
         try:
-            with LocustTimer('connect') as ctx:
+            with self.timing() as ctx:
                 self.client.start()
                 ctx.success()
         finally:
             self.client.stop()
 
 
-class ZKGetOp(AbstractOp):
+class ZKGetOp(AbstractSingleTimerOp):
     def __init__(self,
                  client,
-                 maybe_interrupt=None,
+                 *,
+                 request_type='get',
                  sequential_keys=False,
                  key_space_size=128,
                  key_size=_default_key_size,
                  val_size=_default_val_size,
-                 label='get'):
-        super(ZKGetOp, self).__init__(client, maybe_interrupt)
+                 **kwargs):
+        super(ZKGetOp, self).__init__(
+            client, request_type=request_type, **kwargs)
         self._k = self.client.get_zk_client()
 
         n, v = _create_random_key(client, key_size, sequential_keys,
                                   key_space_size, val_size)
 
         self._n = n
-        self._label = label
 
     def op(self):
-        with LocustTimer(self._label) as ctx:
+        with self.timing() as ctx:
             self._k.get(self._n)
             ctx.success()
 
 
-class ZKSetOp(AbstractOp):
+class ZKSetOp(AbstractSingleTimerOp):
     def __init__(self,
                  client,
-                 maybe_interrupt=None,
+                 *,
+                 request_type='set',
                  sequential_keys=False,
                  key_space_size=128,
                  key_size=_default_key_size,
-                 val_size=_default_val_size):
-        super(ZKSetOp, self).__init__(client, maybe_interrupt)
+                 val_size=_default_val_size,
+                 **kwargs):
+        super(ZKSetOp, self).__init__(
+            client, request_type=request_type, **kwargs)
         self._k = self.client.get_zk_client()
 
         n, v = _create_random_key(client, key_size, sequential_keys,
@@ -158,20 +179,23 @@ class ZKSetOp(AbstractOp):
         self._v = v
 
     def op(self):
-        with LocustTimer('set') as ctx:
+        with self.timing() as ctx:
             self._k.set(self._n, self._v)
             ctx.success()
 
 
-class ZKIncrementingSetOp(AbstractOp):
+class ZKIncrementingSetOp(AbstractSingleTimerOp):
     def __init__(self,
                  client,
-                 maybe_interrupt=None,
+                 *,
+                 request_type='incr_set',
                  sequential_keys=False,
                  key_space_size=128,
                  key_size=_default_key_size,
-                 val_size=_default_val_size):
-        super(ZKIncrementingSetOp, self).__init__(client, maybe_interrupt)
+                 val_size=_default_val_size,
+                 **kwargs):
+        super(ZKIncrementingSetOp, self).__init__(
+            client, request_type=request_type, **kwargs)
         self._k = self.client.get_zk_client()
 
         n = _gen_test_path(client, key_size, sequential_keys, key_space_size)
@@ -195,15 +219,21 @@ class ZKIncrementingSetOp(AbstractOp):
     def op(self):
         v = self.next_val()
 
-        with LocustTimer('incr_set') as ctx:
+        with self.timing() as ctx:
             self._k.set(self._n, v)
             ctx.success()
 
 
-class ZKCreateEphemeralOp(AbstractOp):
-    def __init__(self, client, maybe_interrupt=None, base_path=None,
-                 push=None):
-        super(ZKCreateEphemeralOp, self).__init__(client, maybe_interrupt)
+class ZKCreateEphemeralOp(AbstractSingleTimerOp):
+    def __init__(self,
+                 client,
+                 *,
+                 request_type='create_ephemeral',
+                 base_path=None,
+                 push=None,
+                 **kwargs):
+        super(ZKCreateEphemeralOp, self).__init__(
+            client, request_type=request_type, **kwargs)
 
         if not base_path:
             base_path = client.join_path('/c-')
@@ -214,16 +244,17 @@ class ZKCreateEphemeralOp(AbstractOp):
 
     def op(self):
         k = None
-        with LocustTimer('create_ephemeral') as ctx:
+        with self.timing() as ctx:
             k = self._k.create(self._base_path, ephemeral=True, sequence=True)
             ctx.success()
         if k and self._push:
             self._push(k)
 
 
-class ZKDeleteFromQueueOp(AbstractOp):
-    def __init__(self, client, pop, maybe_interrupt=None):
-        super(ZKDeleteFromQueueOp, self).__init__(client, maybe_interrupt)
+class ZKDeleteFromQueueOp(AbstractSingleTimerOp):
+    def __init__(self, client, pop, *, request_type='delete', **kwargs):
+        super(ZKDeleteFromQueueOp, self).__init__(
+            client, request_type=request_type, **kwargs)
 
         self._k = client.get_zk_client()
         self._pop = pop
@@ -236,14 +267,20 @@ class ZKDeleteFromQueueOp(AbstractOp):
             pass
 
         if k:
-            with LocustTimer('delete') as ctx:
+            with self.timing() as ctx:
                 self._k.delete(k)
                 ctx.success()
 
 
-class ZKCountChildrenOp(AbstractOp):
-    def __init__(self, client, maybe_interrupt=None, path=None):
-        super(ZKCountChildrenOp, self).__init__(client, maybe_interrupt)
+class ZKCountChildrenOp(AbstractSingleTimerOp):
+    def __init__(self,
+                 client,
+                 *,
+                 request_type='count_children',
+                 path=None,
+                 **kwargs):
+        super(ZKCountChildrenOp, self).__init__(
+            client, request_type=request_type, **kwargs)
 
         if not path:
             path = client.join_path('/')
@@ -252,48 +289,53 @@ class ZKCountChildrenOp(AbstractOp):
         self._path = path
 
     def op(self):
-        with LocustTimer('count_children') as ctx:
+        with self.timing() as ctx:
             s = self._k.exists(self._path)
             ctx.success(response_length=s.children_count)
 
 
-class ZKExistsOp(AbstractOp):
-    def __init__(self, client, path, label, maybe_interrupt=None):
-        super(ZKExistsOp, self).__init__(client, maybe_interrupt)
+class ZKExistsOp(AbstractSingleTimerOp):
+    def __init__(self, client, path, *, request_type='exists', **kwargs):
+        super(ZKExistsOp, self).__init__(
+            client, request_type=request_type, **kwargs)
 
         self._k = client.get_zk_client()
         self._path = path
-        self._label = label
 
     def op(self):
-        with LocustTimer(self._label) as ctx:
+        with self.timing() as ctx:
             # Answer is ignored.
             self._k.exists(self._path)
             ctx.success()
 
 
-class ZKExistsWithWatchOp(AbstractOp):
-    def __init__(self, client, path, label, maybe_interrupt=None):
-        super(ZKExistsWithWatchOp, self).__init__(client, maybe_interrupt)
+class ZKExistsWithWatchOp(AbstractSingleTimerOp):
+    def __init__(self, client, path, *, request_type='exists_watch', **kwargs):
+        super(ZKExistsWithWatchOp, self).__init__(
+            client, request_type=request_type, **kwargs)
 
         self._k = client.get_zk_client()
         self._path = path
-        self._label = label
 
     def op(self):
         def zk_watch_trigger(event):
             pass
 
-        with LocustTimer(self._label) as ctx:
+        with self.timing() as ctx:
             # Answer is ignored.
             self._k.exists(self._path, watch=zk_watch_trigger)
             ctx.success()
 
 
-class ZKExistsWithManyWatchesOp(AbstractOp):
-    def __init__(self, client, maybe_interrupt=None, base_path=None):
+class ZKExistsWithManyWatchesOp(AbstractSingleTimerOp):
+    def __init__(self,
+                 client,
+                 *,
+                 request_type='exists_negative_watch_many',
+                 base_path=None,
+                 **kwargs):
         super(ZKExistsWithManyWatchesOp, self).__init__(
-            client, maybe_interrupt)
+            client, request_type=request_type, **kwargs)
 
         if not base_path:
             base_path = client.join_path('/doesnotexist-')
@@ -306,7 +348,7 @@ class ZKExistsWithManyWatchesOp(AbstractOp):
         def zk_watch_trigger(event):
             pass
 
-        with LocustTimer('exists_negative_watch_many') as ctx:
+        with self.timing() as ctx:
             self._i += 1
             # Answer is ignored.
             self._k.exists(
@@ -314,28 +356,31 @@ class ZKExistsWithManyWatchesOp(AbstractOp):
             ctx.success()
 
 
-class ZKGetChildrenOp(AbstractOp):
-    def __init__(self, client, path, maybe_interrupt=None):
-        super(ZKGetChildrenOp, self).__init__(client, maybe_interrupt)
+class ZKGetChildrenOp(AbstractSingleTimerOp):
+    def __init__(self, client, path, *, request_type='get_children', **kwargs):
+        super(ZKGetChildrenOp, self).__init__(
+            client, request_type=request_type, **kwargs)
 
         self._k = self.client.get_zk_client()
         self._path = path
 
     def op(self):
-        with LocustTimer('get_children') as ctx:
+        with self.timing() as ctx:
             c = self._k.get_children(self._path)
             ctx.success(len(c))
 
 
-class ZKGetChildren2Op(AbstractOp):
-    def __init__(self, client, path, maybe_interrupt=None):
-        super(ZKGetChildren2Op, self).__init__(client, maybe_interrupt)
+class ZKGetChildren2Op(AbstractSingleTimerOp):
+    def __init__(self, client, path, *, request_type='get_children2',
+                 **kwargs):
+        super(ZKGetChildren2Op, self).__init__(
+            client, request_type=request_type, **kwargs)
 
         self._k = self.client.get_zk_client()
         self._path = path
 
     def op(self):
-        with LocustTimer('get_children2') as ctx:
+        with self.timing() as ctx:
             c, stat = self._k.get_children(self._path, include_data=True)
             ctx.success(len(c))
 
@@ -344,11 +389,16 @@ class ZKWatchOp(AbstractOp):
     def __init__(self,
                  client,
                  path,
-                 maybe_interrupt=None,
-                 val_size=_default_val_size):
-        super(ZKWatchOp, self).__init__(client, maybe_interrupt)
+                 *,
+                 request_type='watch',
+                 task_set_name='',
+                 val_size=_default_val_size,
+                 **kwargs):
+        super(ZKWatchOp, self).__init__(client, **kwargs)
 
         self._k = self.client.get_zk_client()
+        self._request_type = request_type
+        self._task_set_name = task_set_name
         self._path = path
         self._val_size = val_size
 
@@ -360,8 +410,8 @@ class ZKWatchOp(AbstractOp):
             start_time = int.from_bytes(v, byteorder=sys.byteorder) / 1000
 
             events.request_success.fire(
-                request_type='watch',
-                name='',
+                request_type=self._request_type,
+                name=self._task_set_name,
                 response_time=int((end_time - start_time) * 1000),
                 response_length=0,
             )
