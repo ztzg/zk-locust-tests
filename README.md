@@ -125,10 +125,12 @@ polling without setting up a Web UI.
 
 ## Parameters
 
+### "ZK Locust" Parameters
+
 The parameters can either be controlled by "flag" arguments to the
 `parameterized-locust.sh` wrapper script (starting with `--`), or by
 setting (upper-case) environment variables.  (Note that the wrapper
-systematically clears the latter.)
+systematically clears the latter, except for "benchmark" parameters.)
 
   * `--hosts`, `ZK_LOCUST_HOSTS`: A ZooKeeper "connect string"
     including the addresses of the ensemble;
@@ -182,6 +184,26 @@ systematically clears the latter.)
   * `--stats-distrib`, `LOCUST_EXTRA_STATS_DISTRIB`: Path to the file
     in which to collect full (rounded) distributions.
 
+  * `--bench-*`: As a special case, an open-ended set of "benchmark"
+    parameters is accepted; those are not validated and simply
+    "forwarded" to corresponding `ZK_LOCUST_BENCH_*` variables.  E.g.,
+    `--bench-the-answer 42` is equivalent to:
+
+        export ZK_LOCUST_BENCH_THE_ANSWER=42
+
+### Reporting Parameters
+
+The `parameterized-locust.sh` script can be directed to generate a
+report when the locust runner exists.  The unique reporting parameter
+currently is:
+
+  * `--report-dir`: The name of a directory to use to store the
+    collected metrics and generate a "human-readable" report.
+
+It is recommended *not* to use `--zk-metrics-csv` or `--stats-csv` in
+conjunction with `--report-dir` to allow the script to use
+conventionally named files in that directory.
+
 ## "Locustfiles" Starter Kit
 
 The `locust_*.py` files are "locustfiles," and test various aspects of
@@ -195,6 +217,26 @@ One notable exception is `locust_sequence.py`, which implements a
 complete "suite" of tests to be run sequentially.
 
   * TODO(ddiederen): Generate more representative loads.
+
+## Examples
+
+Running the `locust_sequence.py` suite in standalone mode, unleashing
+256 clients on `$MY_ENSEMBLE`, collecting metrics every 500ms, and
+finally generating a report in `../my-report-3`:
+
+    ./parameterized-locust.sh                   \
+        --hosts "$MY_ENSEMBLE"                  \
+        --kazoo-handler gevent                  \
+        --min-wait 150                          \
+        --max-wait 300                          \
+        --stats-collect 500                     \
+        --zk-metrics-collect 500                \
+        --bench-step-duration 15                \
+        --report-dir ../my-report-3             \
+        --                                      \
+            --reset-stats --no-web              \
+            -c 256 -r 64                        \
+            -f locust_sequence.py
 
 ## Pictures
 
