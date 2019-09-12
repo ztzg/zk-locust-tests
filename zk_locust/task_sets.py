@@ -4,6 +4,12 @@ from zk_locust import ZKLocustTaskSet
 from zk_locust.ops import ZKSetOp, ZKIncrementingSetOp, ZKGetOp, ZKConnectOp, ZKCreateEphemeralOp, ZKDeleteFromQueueOp, ZKCountChildrenOp, ZKExistsOp, ZKExistsWithWatchOp, ZKExistsWithManyWatchesOp, ZKWatchOp, ZKGetChildrenOp, ZKGetChildren2Op
 
 
+def compose_task_set_name(name, suffix):
+    if not suffix:
+        return name
+    return name + '_' + suffix
+
+
 class ZKConnectTaskSet(ZKLocustTaskSet):
     def __init__(self, parent, *, name='connect', **kwargs):
         super(ZKConnectTaskSet, self).__init__(parent, **kwargs)
@@ -14,30 +20,57 @@ class ZKConnectTaskSet(ZKLocustTaskSet):
 
 
 class ZKSetTaskSet(ZKLocustTaskSet):
-    def __init__(self, parent, *, name='set', val_size=None, **kwargs):
+    def __init__(self,
+                 parent,
+                 *,
+                 name='set',
+                 suffix=None,
+                 val_size=None,
+                 **kwargs):
         super(ZKSetTaskSet, self).__init__(parent, **kwargs)
 
-        op = ZKSetOp(self.client, task_set_name=name, val_size=val_size)
+        op = ZKSetOp(
+            self.client,
+            task_set_name=compose_task_set_name(name, suffix),
+            val_size=val_size)
 
         self.tasks = [op.task]
 
 
 class ZKGetTaskSet(ZKLocustTaskSet):
-    def __init__(self, parent, *, name='get', val_size=None, **kwargs):
+    def __init__(self,
+                 parent,
+                 *,
+                 name='get',
+                 suffix=None,
+                 val_size=None,
+                 **kwargs):
         super(ZKGetTaskSet, self).__init__(parent, **kwargs)
 
-        op = ZKGetOp(self.client, task_set_name=name, val_size=val_size)
+        op = ZKGetOp(
+            self.client,
+            task_set_name=compose_task_set_name(name, suffix),
+            val_size=val_size)
 
         self.tasks = [op.task]
 
 
 class ZKSetAndGetTaskSet(ZKLocustTaskSet):
-    def __init__(self, parent, *, name='set_and_get', val_size=None, **kwargs):
+    def __init__(self,
+                 parent,
+                 *,
+                 name='set_and_get',
+                 suffix=None,
+                 val_size=None,
+                 **kwargs):
         super(ZKSetAndGetTaskSet, self).__init__(parent, **kwargs)
 
+        task_set_name = compose_task_set_name(name, suffix)
+
         set_op = ZKIncrementingSetOp(
-            self.client, task_set_name=name, val_size=val_size)
-        get_op = ZKGetOp(self.client, task_set_name=name, val_size=val_size)
+            self.client, task_set_name=task_set_name, val_size=val_size)
+        get_op = ZKGetOp(
+            self.client, task_set_name=task_set_name, val_size=val_size)
 
         # KLUDGE: Locust's dictionary approach does not work with
         # constructors.
@@ -49,20 +82,22 @@ class ZKCreateAndDeleteTaskSet(ZKLocustTaskSet):
                  parent,
                  *,
                  name='create_and_delete',
+                 suffix=None,
                  val_size=None,
                  **kwargs):
         super(ZKCreateAndDeleteTaskSet, self).__init__(parent, **kwargs)
 
+        task_set_name = compose_task_set_name(name, suffix)
         do_delete = deque()
 
         create_op = ZKCreateEphemeralOp(
             self.client,
             push=do_delete.append,
-            task_set_name=name,
+            task_set_name=compose_task_set_name(name, suffix),
             val_size=val_size)
         delete_op = ZKDeleteFromQueueOp(
-            self.client, pop=do_delete.popleft, task_set_name=name)
-        count_op = ZKCountChildrenOp(self.client, task_set_name=name)
+            self.client, pop=do_delete.popleft, task_set_name=task_set_name)
+        count_op = ZKCountChildrenOp(self.client, task_set_name=task_set_name)
 
         # KLUDGE: Locust's dictionary approach does not work with
         # constructors.
