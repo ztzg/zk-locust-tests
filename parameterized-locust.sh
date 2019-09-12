@@ -69,6 +69,12 @@ while [ -z "$dashdash" -a "$#" -gt '0' ]; do
             set_var 'LOCUST_EXTRA_' "${1:2}" "$2"
             shift 2
             ;;
+        --bench-*)
+            # This is an open-ended set of parameters which we are
+            # consequently not clearing!
+            set_var 'ZK_LOCUST_' "${1:2}" "$2"
+            shift 2
+            ;;
         --multi)
             multi_count="$2"
             shift 2
