@@ -125,6 +125,19 @@ def collect_extra_stats(stats_csv_path, distrib_path, last_num_requests):
 
 
 def collect_extra_stats_loop(stats_csv_path, distrib_path, delay_s):
+    while not locust.runners.locust_runner:
+        gevent.idle()
+    if isinstance(locust.runners.locust_runner,
+                  locust.runners.SlaveLocustRunner):
+        return
+
+    if stats_csv_path:
+        _logger.info("Writing extra stats to CSV: '%s'; delay %ds" %
+                     (stats_csv_path, delay_s))
+    if distrib_path:
+        _logger.info("Writing full distributions to: '%s'; delay %ds" %
+                     (distrib_path, delay_s))
+
     num_requests = 0
     while True:
         num_requests = collect_extra_stats(stats_csv_path, distrib_path,
@@ -133,12 +146,6 @@ def collect_extra_stats_loop(stats_csv_path, distrib_path, delay_s):
 
 
 def spawn_collector(stats_csv_path, distrib_path, delay_ms):
-    if stats_csv_path:
-        _logger.info("Writing extra stats to CSV: '%s'; delay %dms" %
-                     (stats_csv_path, delay_ms))
-    if distrib_path:
-        _logger.info("Writing full distributions to: '%s'; delay %dms" %
-                     (distrib_path, delay_ms))
     gevent.spawn(collect_extra_stats_loop, stats_csv_path, distrib_path,
                  delay_ms / 1000.0)
 
