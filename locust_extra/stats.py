@@ -21,16 +21,16 @@ _percentiles = [0.5, 0.66, 0.75, 0.80, 0.90, 0.95, 0.98, 0.99, 1.00]
 
 _columns = [
     'timestamp',
-    'Method',
-    'Name',
-    '# requests',
-    '# failures',
-    'Median response time',
-    'Average response time',
-    'Min response time',
-    'Max response time',
-    'Average Content Size',
-    'Requests/s',
+    'method',
+    'name',
+    'num_requests',
+    'num_failures',
+    'median_response_time',
+    'avg_response_time',
+    'min_response_time',
+    'max_response_time',
+    'avg_content_length',
+    'total_rps',
 ] + ["%.2d%%" % int(f * 100) for f in _percentiles]
 
 

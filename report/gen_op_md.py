@@ -7,21 +7,27 @@ import matplotlib.pyplot as plt
 
 pandas.plotting.register_matplotlib_converters()
 
+_report_keys = {
+    'num_requests': '# requests',
+    'num_failures': '# failures',
+    'median_response_time': 'Median response time',
+    'avg_response_time': 'Average response time',
+    'min_response_time': 'Min response time',
+    'max_response_time': 'Max response time',
+    'total_rps': 'Requests/s',
+}
+
 
 def write_md(df, task_set, op, md_path, base_path):
     data = df.tail(1)
 
     with open(md_path, 'w') as f:
         f.write("## Task set '%s', op '%s'\n\n" % (task_set, op))
-        for metric in [
-                '# requests', '# failures', 'Median response time',
-                'Average response time', 'Min response time',
-                'Max response time', 'Requests/s'
-        ]:
-            v = data[metric][0]
+        for key, label in _report_keys.items():
+            v = data[key][0]
             if isinstance(v, float):
                 v = round(v, 3)
-            f.write('  * %s: %s\n' % (metric.replace('#', '\\#'), v))
+            f.write('  * %s: %s\n' % (label.replace('#', '\\#'), v))
         f.write('\n![](%s)\n' % base_path)
         f.write('\n### Percentiles\n\n')
         for pc in [
