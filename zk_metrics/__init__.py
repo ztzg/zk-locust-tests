@@ -11,6 +11,7 @@ from jinja2 import TemplateNotFound
 
 from locust import __version__ as version
 from locust.web import app
+import locust.runners
 
 from zk_locust import get_zk_hosts, split_zk_hosts
 
@@ -40,6 +41,12 @@ def compose_metrics_url(zk_host_port, command):
 
 
 def metrics_collect_loop(zk_host_port, url, delay_s):
+    while not locust.runners.locust_runner:
+        gevent.sleep(0.1)
+    if isinstance(locust.runners.locust_runner,
+                  locust.runners.SlaveLocustRunner):
+        return
+
     while True:
         try:
             r = requests.get(url, allow_redirects=False, stream=False)
