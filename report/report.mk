@@ -50,11 +50,13 @@ subsets.mk:					\
 .PRECIOUS: %.fragment.done
 %.fragment.done:				\
 		%.ls_subset.csv			\
+		%.zkm_subset.csv		\
 		$(SCRIPT_DIR)/gen_op_md.py
 	@echo '  FRAGMENT $*'
 	@mkdir -p $(dir $@)
 	$(SCRIPT_DIR)/gen_op_md.py		\
-	    $<					\
+	    $*.ls_subset.csv			\
+	    $*.zkm_subset.csv			\
 	    $*					\
 	    $*
 	@touch $@
