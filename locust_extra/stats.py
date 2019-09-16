@@ -31,6 +31,7 @@ _columns = [
     'max_response_time',
     'avg_content_length',
     'total_rps',
+    'user_count',
 ] + ["%.2d%%" % int(f * 100) for f in _percentiles]
 
 
@@ -40,7 +41,7 @@ def write_csv_header_locked(output):
     output.num_requests = 0
 
 
-def write_csv_row(timestamp, s, output):
+def write_csv_row(timestamp, s, user_count, output):
     row = [
         timestamp,
         s.method,
@@ -53,6 +54,7 @@ def write_csv_row(timestamp, s, output):
         s.max_response_time,
         s.avg_content_length,
         s.total_rps,
+        user_count,
     ] + [s.get_response_time_percentile(f) for f in _percentiles]
 
     with output.lock:
@@ -60,7 +62,7 @@ def write_csv_row(timestamp, s, output):
         output.f.flush()
 
 
-def write_jsonl_entry(timestamp, s, errors, output):
+def write_jsonl_entry(timestamp, s, user_count, errors, output):
     info = {
         'timestamp': timestamp,
         'method': s.method,
@@ -73,6 +75,7 @@ def write_jsonl_entry(timestamp, s, errors, output):
         'max_response_time': s.max_response_time,
         'avg_content_length': s.avg_content_length,
         'total_rps': s.total_rps,
+        'user_count': user_count,
         'response_times': s.response_times
     }
 
@@ -93,6 +96,7 @@ def collect_extra_stats(stats_csv_path, distrib_path, last_num_requests):
     if not locust_runner:
         return
 
+    user_count = locust_runner.user_count
     total = locust_runner.stats.total
     errors = locust_runner.stats.serialize_errors()
     num_requests = total.num_requests
@@ -121,11 +125,11 @@ def collect_extra_stats(stats_csv_path, distrib_path, last_num_requests):
     request_stats = sort_stats(locust_runner.request_stats)
     for s in chain(request_stats, [total]):
         if stats_output:
-            write_csv_row(timestamp, s, stats_output)
+            write_csv_row(timestamp, s, user_count, stats_output)
 
         if distrib_output:
-            write_jsonl_entry(timestamp, s, errors if s is total else None,
-                              distrib_output)
+            write_jsonl_entry(timestamp, s, user_count,
+                              errors if s is total else None, distrib_output)
 
     return num_requests
 
