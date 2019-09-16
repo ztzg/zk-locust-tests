@@ -60,7 +60,7 @@ def write_csv_row(timestamp, s, output):
         output.f.flush()
 
 
-def write_jsonl_entry(timestamp, s, output):
+def write_jsonl_entry(timestamp, s, errors, output):
     info = {
         'timestamp': timestamp,
         'method': s.method,
@@ -75,6 +75,10 @@ def write_jsonl_entry(timestamp, s, output):
         'total_rps': s.total_rps,
         'response_times': s.response_times
     }
+
+    if errors:
+        info['errors'] = errors
+
     s = json.dumps(info, ensure_ascii=True, indent=None)
 
     with output.lock:
@@ -90,6 +94,7 @@ def collect_extra_stats(stats_csv_path, distrib_path, last_num_requests):
         return
 
     total = locust_runner.stats.total
+    errors = locust_runner.stats.serialize_errors()
     num_requests = total.num_requests
     if num_requests == last_num_requests:
         # Not using > in case stats were reset.
@@ -119,7 +124,8 @@ def collect_extra_stats(stats_csv_path, distrib_path, last_num_requests):
             write_csv_row(timestamp, s, stats_output)
 
         if distrib_output:
-            write_jsonl_entry(timestamp, s, distrib_output)
+            write_jsonl_entry(timestamp, s, errors if s is total else None,
+                              distrib_output)
 
     return num_requests
 
