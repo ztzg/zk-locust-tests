@@ -22,21 +22,34 @@ subsets.mk:					\
 	$(SCRIPT_DIR)/gen_subsets_mk.py TASK_SETS TASK_SET_OPS $< >$@.tmp
 	@mv $@.tmp $@
 
-.PRECIOUS: %.subset.csv
-%.subset.csv:						\
+.PRECIOUS: %.ls_subset.csv
+%.ls_subset.csv:					\
 		$(LOCUST_EXTRA_STATS_CSV)		\
-		$(SCRIPT_DIR)/extract_subset_csv.py
-	@echo '  EXTRACT $*'
+		$(SCRIPT_DIR)/extract_ls_subset_csv.py
+	@echo '  EXTRACT $* Locust stats'
 	@mkdir -p $(dir $@)
-	$(SCRIPT_DIR)/extract_subset_csv.py	\
+	$(SCRIPT_DIR)/extract_ls_subset_csv.py	\
 	    $(LOCUST_EXTRA_STATS_CSV)		\
+	    $*					\
+	    $@.tmp
+	@mv $@.tmp $@
+
+.PRECIOUS: %.zkm_subset.csv
+%.zkm_subset.csv:					\
+		%.ls_subset.csv				\
+		$(ZK_LOCUST_ZK_METRICS_CSV)		\
+		$(SCRIPT_DIR)/extract_zkm_subset_csv.py
+	@echo '  EXTRACT $* ZK metrics'
+	$(SCRIPT_DIR)/extract_zkm_subset_csv.py	\
+	    $<					\
+	    $(ZK_LOCUST_ZK_METRICS_CSV)		\
 	    $*					\
 	    $@.tmp
 	@mv $@.tmp $@
 
 .PRECIOUS: %.fragment.done
 %.fragment.done:				\
-		%.subset.csv			\
+		%.ls_subset.csv			\
 		$(SCRIPT_DIR)/gen_op_md.py
 	@echo '  FRAGMENT $*'
 	@mkdir -p $(dir $@)
