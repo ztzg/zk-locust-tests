@@ -11,6 +11,7 @@ import locust.runners
 from locust import events
 
 from zk_locust import ZKLocust, ZKLocustTaskSequence
+from zk_locust.backend_kazoo import KazooLocustClient
 from locust_extra.stats import register_extra_stats
 from zk_metrics import register_zk_metrics
 
@@ -23,6 +24,7 @@ register_zk_metrics()
 _bench_repetitions = int(os.getenv('ZK_LOCUST_BENCH_REPETITIONS') or '1')
 _bench_step_duration = float(
     os.getenv('ZK_LOCUST_BENCH_STEP_DURATION') or '10')
+_bench_barrier_hosts = os.getenv('ZK_LOCUST_BENCH_BARRIER_HOSTS')
 _bench_barrier_path = os.getenv('ZK_LOCUST_BENCH_BARRIER_PATH', '/kl_barrier')
 
 # _bench_val_sizes = [None]
@@ -52,13 +54,10 @@ def on_hatch_complete(user_count):
 events.hatch_complete += on_hatch_complete
 
 
-def barrier_wrap(task):
+def barrier_wrap(zk_client, task):
     def fn(task_set):
         if _num_clients is None or _num_clients <= 0:
             raise Exception('Invalid client count: %s' % _num_clients)
-        # Should we use another client?  (Possibly targeting another
-        # ensemble!)
-        zk_client = task_set.client.get_zk_client()
         barrier = DoubleBarrier(zk_client, _bench_barrier_path, _num_clients)
         barrier.enter()
         try:
@@ -149,7 +148,16 @@ class Sequence(ZKLocust):
             ]
 
             if _bench_barrier_path:
-                tasks = [barrier_wrap(task) for task in tasks]
+                if _bench_barrier_hosts:
+                    client = KazooLocustClient(
+                        hosts=_bench_barrier_hosts,
+                        pseudo_root=None,
+                        autostart=True)
+                else:
+                    client = self.client
+                zk_client = client.get_zk_client()
+
+                tasks = [barrier_wrap(zk_client, task) for task in tasks]
 
             tasks *= _bench_repetitions
 
