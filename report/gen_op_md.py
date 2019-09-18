@@ -78,6 +78,8 @@ def write_md(df, task_set, op, md_path, latencies_base_path,
             f.write('\n#### %s\n\n' % label)
             f.write('\n![](%s)\n' % base_path)
 
+        f.write('\n')
+
 
 def plot_latencies(df, latencies_base_path):
     fig = plt.figure()
