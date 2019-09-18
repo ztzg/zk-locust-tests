@@ -70,8 +70,10 @@ def write_md(df, task_set, op, md_path, latencies_base_path,
         f.write('\n### Other Metrics\n\n')
         f.write('\n#### Client Count\n\n')
         f.write('\n![](%s)\n' % user_count_base_path)
-        f.write('\n#### Requests\n\n')
-        f.write('\n![](%s)\n' % num_requests_base_path)
+
+        if num_requests_base_path:
+            f.write('\n#### Requests\n\n')
+            f.write('\n![](%s)\n' % num_requests_base_path)
 
         f.write('\n### ZooKeeper Metrics\n\n')
         for label, base_path in zkm_plot_infos:
@@ -177,8 +179,11 @@ def main(executable, ls_csv_path, zkm_csv_path, task_set_and_op, base_path):
     user_count_base_path = base_path + '_user_count'
     plot_user_count(ls_df, user_count_base_path)
 
-    num_requests_base_path = base_path + '_num_requests'
-    plot_num_requests(ls_df, num_requests_base_path)
+    if ls_df.shape[0] < 2:
+        num_requests_base_path = None
+    else:
+        num_requests_base_path = base_path + '_num_requests'
+        plot_num_requests(ls_df, num_requests_base_path)
 
     zkm_plot_infos = []
     for zkm_plot in _zkm_plots:
