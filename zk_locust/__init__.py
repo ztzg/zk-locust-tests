@@ -16,14 +16,29 @@ MAX_WAIT = max(int(os.getenv('ZK_LOCUST_MAX_WAIT', '0')), MIN_WAIT)
 _backend_exceptions_dict = {}
 _backend_exceptions = ()
 
+_zk_re_port = re.compile(r"(.*):(\d{1,4})$")
+
 
 def get_zk_hosts():
     return ZK_HOSTS
 
 
-def split_zk_hosts(raw):
-    no_chroot = re.sub(r"/.*", "", raw.strip())
-    return re.split(r"\s*,\s*", no_chroot)
+def split_zk_hosts(connect_string=None):
+    if not connect_string:
+        connect_string = get_zk_hosts()
+
+    no_chroot = re.sub(r"/.*", "", connect_string.strip())
+    hosts = re.split(r"\s*,\s*", no_chroot)
+
+    return hosts
+
+
+def split_zk_host_port(host_port):
+    r = _zk_re_port.match(host_port)
+    if not r:
+        return (host_port, None)
+    else:
+        return (r[1], int(r[2]))
 
 
 def register_exceptions(exceptions):
