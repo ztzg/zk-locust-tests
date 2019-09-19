@@ -26,7 +26,7 @@ subsets.mk:					\
 %.ls_subset.csv:					\
 		$(LOCUST_EXTRA_STATS_CSV)		\
 		$(SCRIPT_DIR)/extract_ls_subset_csv.py
-	@echo '  EXTRACT $* Locust stats'
+	@echo '  EXTRACT  $* Locust stats'
 	@mkdir -p $(dir $@)
 	$(SCRIPT_DIR)/extract_ls_subset_csv.py	\
 	    $(LOCUST_EXTRA_STATS_CSV)		\
@@ -39,7 +39,7 @@ subsets.mk:					\
 		%.ls_subset.csv				\
 		$(ZK_LOCUST_ZK_METRICS_CSV)		\
 		$(SCRIPT_DIR)/extract_zkm_subset_csv.py
-	@echo '  EXTRACT $* ZK metrics'
+	@echo '  EXTRACT  $* ZK metrics'
 	$(SCRIPT_DIR)/extract_zkm_subset_csv.py	\
 	    $<					\
 	    $(ZK_LOCUST_ZK_METRICS_CSV)		\
