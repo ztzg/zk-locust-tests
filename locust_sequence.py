@@ -45,6 +45,9 @@ _bench_barrier_path = os.getenv('ZK_LOCUST_BENCH_BARRIER_PATH', '/kl_barrier')
 # _bench_val_sizes = [None]
 _bench_val_sizes = [8, 512, 8 * 1024]
 
+_bench_include = None
+# _bench_include = ['run_set', 'run_get']
+
 
 def startup(*args, **kwargs):
     pass
@@ -151,6 +154,11 @@ class Sequence(ZKLocust):
                 run_watch, run_exists, run_exists_many, run_get_children,
                 run_get_children2
             ]
+
+            if _bench_include:
+                tasks = [
+                    task for task in tasks if task.__name__ in _bench_include
+                ]
 
             if _bench_barrier_path:
                 if _bench_barrier_hosts:
