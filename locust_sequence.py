@@ -51,11 +51,11 @@ def startup(*args, **kwargs):
 
 
 def shutdown(*args, **kwargs):
-    if False:
-        locust_runner = locust.runners.locust_runner
-        locust_runner.quit()
-    else:
+    locust_runner = locust.runners.locust_runner
+    if isinstance(locust_runner, locust.runners.SlaveLocustRunner):
         raise GreenletExit()
+    else:
+        locust_runner.quit()
 
 
 def barrier_wrap(zk_client, task):
