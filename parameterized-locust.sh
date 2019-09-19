@@ -51,6 +51,7 @@ die() {
 dashdash=
 multi_count=
 multi_workdir=
+extra_locust_args=()
 
 while [ -z "$dashdash" -a "$#" -gt '0' ]; do
     case "$1" in
@@ -68,6 +69,11 @@ while [ -z "$dashdash" -a "$#" -gt '0' ]; do
             ;;
         --stats-csv|--stats-distrib|--stats-collect)
             set_var 'LOCUST_EXTRA_' "${1:2}" "$2"
+            shift 2
+            ;;
+        -c|--clients)
+            set_var 'ZK_LOCUST_NUM_CLIENTS' '' "$2"
+            extra_locust_args+=("$1" "$2")
             shift 2
             ;;
         --bench-*)
@@ -119,13 +125,14 @@ fi
 # Locust invocation.
 
 if [ -z "$multi_count" ]; then
-    locust "$@"
+    locust "$@" "${extra_locust_args[@]}"
 else
     if [ -z "$multi_workdir" ]; then
         multi_workdir="$(mktemp -d)"
         trap "rm -rf '$multi_workdir'" EXIT
     fi
-    "$ZK_LOCUST_TESTS/multi-locust.sh" "$multi_count" "$multi_workdir" "$@"
+    "$ZK_LOCUST_TESTS/multi-locust.sh" "$multi_count" "$multi_workdir" \
+        "$@" "${extra_locust_args[@]}"
 fi
 
 # Report generation.
