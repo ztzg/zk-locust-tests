@@ -37,7 +37,8 @@ set_var() {
     key="${key^^}"
     key="${key//-/_}"
 
-    eval "export $prefix$key=${value@Q}"
+    declare -g "$prefix$key=$value"
+    export "$prefix$key"
 }
 
 die() {
