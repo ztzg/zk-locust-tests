@@ -21,6 +21,21 @@ from zk_locust.task_sets import ZKConnectTaskSet, ZKSetTaskSet, ZKGetTaskSet, ZK
 register_extra_stats()
 register_zk_metrics()
 
+
+def get_num_clients():
+    # Note: we cannot determine the number of clients automatically in
+    # the distributed case (the 'hatch_complete' event is per-slave!).
+    # See -c/--clients parameter of the wrapper script, or set
+    # ZK_LOCUST_NUM_CLIENTS to the correct value.
+    global _num_clients
+    v = os.getenv('ZK_LOCUST_NUM_CLIENTS')
+    if not v:
+        return None
+    return int(v)
+
+
+_num_clients = get_num_clients()
+
 _bench_repetitions = int(os.getenv('ZK_LOCUST_BENCH_REPETITIONS') or '1')
 _bench_step_duration = float(
     os.getenv('ZK_LOCUST_BENCH_STEP_DURATION') or '10')
@@ -30,12 +45,9 @@ _bench_barrier_path = os.getenv('ZK_LOCUST_BENCH_BARRIER_PATH', '/kl_barrier')
 # _bench_val_sizes = [None]
 _bench_val_sizes = [8, 512, 8 * 1024]
 
-_num_clients = None
-
 
 def startup(*args, **kwargs):
-    while _num_clients is None:
-        gevent.sleep(0.5)
+    pass
 
 
 def shutdown(*args, **kwargs):
@@ -46,18 +58,11 @@ def shutdown(*args, **kwargs):
         raise GreenletExit()
 
 
-def on_hatch_complete(user_count):
-    global _num_clients
-    _num_clients = user_count
-
-
-events.hatch_complete += on_hatch_complete
-
-
 def barrier_wrap(zk_client, task):
+    if _num_clients is None or _num_clients <= 0:
+        raise ValueError('Invalid client count: %s' % str(_num_clients))
+
     def fn(task_set):
-        if _num_clients is None or _num_clients <= 0:
-            raise Exception('Invalid client count: %s' % _num_clients)
         barrier = DoubleBarrier(zk_client, _bench_barrier_path, _num_clients)
         barrier.enter()
         try:
