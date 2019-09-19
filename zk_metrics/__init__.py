@@ -13,15 +13,14 @@ from locust import __version__ as version
 from locust.web import app
 import locust.runners
 
-from zk_locust import get_zk_hosts, split_zk_hosts
+from zk_locust import split_zk_hosts, split_zk_host_port
 
 from .csv import maybe_write_metrics_csv
 from .defs import metric_defs
 
 _logger = logging.getLogger(__name__)
 
-_zk_hosts = split_zk_hosts(get_zk_hosts())
-_zk_re_port = re.compile(r":\d{1,4}$")
+_zk_host_ports = split_zk_hosts()
 _zk_metrics_scheme = 'http'
 _zk_metrics_port = 8080
 
@@ -35,7 +34,8 @@ _page = Blueprint(
 
 
 def compose_metrics_url(zk_host_port, command):
-    host_port = _zk_re_port.sub("", zk_host_port) + ':' + str(_zk_metrics_port)
+    host = split_zk_host_port(zk_host_port)[0]
+    host_port = host + ':' + str(_zk_metrics_port)
     url = _zk_metrics_scheme + '://' + host_port + '/commands/' + command
     return url
 
@@ -63,7 +63,7 @@ def ui():
         return render_template(
             'zk_metrics.html',
             version=version,
-            zk_locust_hosts=','.join(_zk_hosts))
+            zk_locust_hosts=','.join(_zk_host_ports))
     except TemplateNotFound:
         abort(404)
 
@@ -77,10 +77,10 @@ def defs():
 
 @_page.route('/proxy/<command>/<int:index>')
 def proxy(command, index):
-    if command != 'monitor' or index < 0 or index >= len(_zk_hosts):
+    if command != 'monitor' or index < 0 or index >= len(_zk_host_ports):
         abort(400)
 
-    zk_host_port = _zk_hosts[index]
+    zk_host_port = _zk_host_ports[index]
     url = compose_metrics_url(zk_host_port, command)
 
     r = requests.get(url, allow_redirects=False, stream=False)
@@ -104,6 +104,6 @@ def register_zk_metrics(url_prefix='/zk-metrics',
     else:
         command = 'monitor'
         delay_s = (delay_ms or int(_zk_metrics_collect)) / 1000.0
-        for zk_host_port in _zk_hosts:
+        for zk_host_port in _zk_host_ports:
             url = compose_metrics_url(zk_host_port, command)
             gevent.spawn(metrics_collect_loop, zk_host_port, url, delay_s)
