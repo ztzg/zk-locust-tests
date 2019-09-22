@@ -8,6 +8,8 @@ from locust import events
 
 controller_available = events.EventHook()
 
+RUNNER_LOCAL, RUNNER_MASTER, RUNNER_SLAVE = ["local", "master", "slave"]
+
 _user_count = None
 _hatch_complete = gevent.event.Event()
 
@@ -15,6 +17,21 @@ _prefix = "locust-extra://"
 
 _STATE_STOPPING = locust.runners.STATE_STOPPING
 _STATE_STOPPED = locust.runners.STATE_STOPPED
+
+
+def _wait_runner_kind():
+    runners = locust.runners
+    kind = None
+    while not runners.locust_runner:
+        gevent.sleep(0.01)
+    if isinstance(runners.locust_runner, runners.LocalLocustRunner):
+        kind = RUNNER_LOCAL
+    elif isinstance(runners.locust_runner, runners.MasterLocustRunner):
+        kind = RUNNER_MASTER
+    elif isinstance(runners.locust_runner, runners.SlaveLocustRunner):
+        kind = RUNNER_SLAVE
+    assert kind
+    return kind
 
 
 def on_start_hatching():
@@ -82,13 +99,9 @@ def _startup(runner, fn):
 
 
 def _controller_poll_runner(fn):
-    runners = locust.runners
-    while not runners.locust_runner:
-        gevent.sleep(0.01)
-    if isinstance(runners.locust_runner, runners.LocalLocustRunner):
-        _startup(runners.locust_runner, fn)
-    elif isinstance(runners.locust_runner, runners.MasterLocustRunner):
-        _startup(runners.locust_runner, fn)
+    kind = _wait_runner_kind()
+    if kind in [RUNNER_LOCAL, RUNNER_MASTER]:
+        _startup(locust.runners.locust_runner, fn)
     # else: abandon greenlet.
 
 
@@ -104,10 +117,23 @@ class Controllee(object):
         _hatch_complete.wait()
 
 
+def _wait_or_shutdown():
+    if _wait_runner_kind() is RUNNER_SLAVE:
+        raise gevent.GreenletExit
+    else:
+        # BUG: LocalLocustRunner instances don't like it when we stop,
+        # and just exit as soon as the greenlets have shut down.  (The
+        # Web UI case is okay, because the HTTP server greenlet
+        # continues to serve.)  This hack doesn't seem to fix it.
+        # TODO(ddiederen): Figure out a workaround.
+        while True:
+            gevent.sleep(0.3)
+
+
 def ensure_controllee(locust):
     # See KLUDGE note above.
     encoded = locust.host
     if not encoded or not encoded.startswith(_prefix):
-        raise gevent.GreenletExit
+        _wait_or_shutdown()
     parameters = json.loads(encoded[len(_prefix):])
     return Controllee(parameters)
