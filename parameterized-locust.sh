@@ -71,11 +71,6 @@ while [ -z "$dashdash" -a "$#" -gt '0' ]; do
             set_var 'LOCUST_EXTRA_' "${1:2}" "$2"
             shift 2
             ;;
-        -c|--clients)
-            set_var 'ZK_LOCUST_NUM_CLIENTS' '' "$2"
-            extra_locust_args+=("$1" "$2")
-            shift 2
-            ;;
         --bench-*)
             # This is an open-ended set of parameters which we are
             # consequently not clearing!
