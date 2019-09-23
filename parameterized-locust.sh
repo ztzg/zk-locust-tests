@@ -52,6 +52,7 @@ dashdash=
 multi_count=
 multi_workdir=
 extra_locust_args=()
+extra_report_args=()
 
 while [ -z "$dashdash" -a "$#" -gt '0' ]; do
     case "$1" in
@@ -87,6 +88,10 @@ while [ -z "$dashdash" -a "$#" -gt '0' ]; do
             ;;
         --report-dir)
             report_dir="$2"
+            shift 2
+            ;;
+        --report-jobs)
+            extra_report_args+=(-j "$2")
             shift 2
             ;;
         --)
@@ -133,10 +138,10 @@ fi
 # Report generation.
 
 if [ -d "$report_dir" ]; then
-    make --no-print-directory \
-        -C "$report_dir" \
-        -f "$ZK_LOCUST_TESTS/report/report.mk" \
-        LOCUST_EXTRA_STATS_CSV="$LOCUST_EXTRA_STATS_CSV" \
-        ZK_LOCUST_ZK_METRICS_CSV="$ZK_LOCUST_ZK_METRICS_CSV" \
-        report
+    "$ZK_LOCUST_TESTS/report.py" \
+        --metrics-dir "$report_dir" \
+        --in-place \
+        --zk-metrics-csv "$ZK_LOCUST_ZK_METRICS_CSV" \
+        --stats-csv "$LOCUST_EXTRA_STATS_CSV" \
+        "${extra_report_args[@]}"
 fi
