@@ -15,7 +15,6 @@ _hatch_complete = gevent.event.Event()
 
 _prefix = "locust-extra://"
 
-_STATE_STOPPING = locust.runners.STATE_STOPPING
 _STATE_STOPPED = locust.runners.STATE_STOPPED
 
 
@@ -71,7 +70,6 @@ class Controller(object):
         runner = self.runner
         runner.stop()
         while runner.state != _STATE_STOPPED:
-            assert runner.state == _STATE_STOPPING
             gevent.sleep(0.01)
 
     def start_runner(self, parameters, *, wait=False):
