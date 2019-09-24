@@ -10,9 +10,13 @@ def main(executable, task_sets_var, ops_var, csv_path):
     task_sets = [x for x in df.name.unique() if x != 'Total']
     print('%s = %s' % (task_sets_var, ' '.join(task_sets)))
 
-    df_full = df.dropna()
+    df_no_total = df[df.name != 'Total']
 
-    ops = [x for x in (df_full.name.map(str) + '/' + df_full.method).unique()]
+    # Empty cells are filled with N/As by Pandas.  We want to carry
+    # them over, but need a name for file system storage; let's use
+    # "UNNAMED_OP" for now.  TODO(ddiederen): Get rid of this.
+    ops = (df_no_total.name.map(str) + '/' +
+           df_no_total.method.fillna('UNNAMED_OP')).unique()
     print('%s = %s' % (ops_var, ' '.join(ops)))
 
 
