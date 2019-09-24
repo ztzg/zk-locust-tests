@@ -47,10 +47,14 @@ _zkm_plots = [{
 
 def write_md(df, task_set, op, md_path, latencies_base_path,
              user_count_base_path, num_requests_base_path, zkm_plot_infos):
-    data = df.tail(1)
-
     with open(md_path, 'w') as f:
         f.write("## Task set '%s', op '%s'\n\n" % (task_set, op))
+
+        data = df.tail(1)
+
+        if len(data) == 0:
+            f.write("(Empty dataset)\n\n")
+            return
 
         for key, label in _ls_key_labels.items():
             v = data[key][0]
@@ -58,8 +62,9 @@ def write_md(df, task_set, op, md_path, latencies_base_path,
                 v = round(v, 3)
             f.write('  * %s: %s\n' % (label.replace('#', '\\#'), v))
 
-        f.write('\n### Latencies\n\n')
-        f.write('\n![](%s)\n' % latencies_base_path)
+        if latencies_base_path:
+            f.write('\n### Latencies\n\n')
+            f.write('\n![](%s)\n' % latencies_base_path)
 
         f.write('\n#### Percentiles\n\n')
         for pc in [
@@ -68,17 +73,20 @@ def write_md(df, task_set, op, md_path, latencies_base_path,
             f.write('  * %s <= %s ms\n' % (pc, data[pc][0]))
 
         f.write('\n### Other Metrics\n\n')
-        f.write('\n#### Client Count\n\n')
-        f.write('\n![](%s)\n' % user_count_base_path)
+
+        if user_count_base_path:
+            f.write('\n#### Client Count\n\n')
+            f.write('\n![](%s)\n' % user_count_base_path)
 
         if num_requests_base_path:
             f.write('\n#### Requests\n\n')
             f.write('\n![](%s)\n' % num_requests_base_path)
 
-        f.write('\n### ZooKeeper Metrics\n\n')
-        for label, base_path in zkm_plot_infos:
-            f.write('\n#### %s\n\n' % label)
-            f.write('\n![](%s)\n' % base_path)
+        if len(zkm_plot_infos) > 0:
+            f.write('\n### ZooKeeper Metrics\n\n')
+            for label, base_path in zkm_plot_infos:
+                f.write('\n#### %s\n\n' % label)
+                f.write('\n![](%s)\n' % base_path)
 
         f.write('\n')
 
@@ -173,11 +181,15 @@ def main(executable, ls_csv_path, zkm_csv_path, task_set_and_op, base_path):
     ls_df = pd.read_csv(ls_csv_path, index_col='timestamp', parse_dates=True)
     zkm_df = pd.read_csv(zkm_csv_path, index_col='timestamp', parse_dates=True)
 
-    latencies_base_path = base_path + '_latencies'
-    plot_latencies(ls_df, latencies_base_path)
+    latencies_base_path = None
+    if len(ls_df) > 0:
+        latencies_base_path = base_path + '_latencies'
+        plot_latencies(ls_df, latencies_base_path)
 
-    user_count_base_path = base_path + '_user_count'
-    plot_user_count(ls_df, user_count_base_path)
+    user_count_base_path = None
+    if len(ls_df) > 0:
+        user_count_base_path = base_path + '_user_count'
+        plot_user_count(ls_df, user_count_base_path)
 
     if ls_df.shape[0] < 2:
         num_requests_base_path = None
@@ -186,9 +198,10 @@ def main(executable, ls_csv_path, zkm_csv_path, task_set_and_op, base_path):
         plot_num_requests(ls_df, num_requests_base_path)
 
     zkm_plot_infos = []
-    for zkm_plot in _zkm_plots:
-        zkm_plot_info = plot_zkm(zkm_df, zkm_plot, base_path)
-        zkm_plot_infos.append(zkm_plot_info)
+    if len(zkm_df) > 0:
+        for zkm_plot in _zkm_plots:
+            zkm_plot_info = plot_zkm(zkm_df, zkm_plot, base_path)
+            zkm_plot_infos.append(zkm_plot_info)
 
     write_md(ls_df, task_set, op, base_path + '.md', latencies_base_path,
              user_count_base_path, num_requests_base_path, zkm_plot_infos)
