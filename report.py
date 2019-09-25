@@ -19,8 +19,9 @@ _base = os.path.dirname(os.path.realpath(__file__))
     help="Generate/update report in metrics directory")
 @click.option("-f", "--force", is_flag=True, help="Possibly overwrite files")
 @click.option("-j", "--jobs", type=click.INT, help="Use parallel jobs")
+@click.option('-v', '--verbose', count=True)
 def cli(metrics_dir, zk_metrics_csv, stats_csv, report_dir, in_place, force,
-        jobs):
+        jobs, verbose):
     if not metrics_dir:
         metrics_dir = "."
     if not zk_metrics_csv:
@@ -61,6 +62,8 @@ def cli(metrics_dir, zk_metrics_csv, stats_csv, report_dir, in_place, force,
 
     if jobs:
         make_args += ["-j", str(jobs)]
+    if verbose:
+        make_args.append("V=1")
 
     os.makedirs(report_dir, exist_ok=True)
     os.execvp("make", make_args + ["report"])
