@@ -7,6 +7,7 @@ from itertools import chain
 import gevent
 
 import locust.runners
+import locust.events
 from locust.stats import sort_stats
 
 from .output import format_timestamp, ensure_output
@@ -141,14 +142,34 @@ def collect_extra_stats_loop(stats_csv_path, distrib_path, delay_s):
                   locust.runners.SlaveLocustRunner):
         return
 
+    is_master = isinstance(locust.runners.locust_runner,
+                           locust.runners.MasterLocustRunner)
+
+    if is_master:
+        info = 'mode: worker-triggered'
+    else:
+        info = 'mode: polling with delay %ds' % delay_s
+
     if stats_csv_path:
-        _logger.info("Writing extra stats to CSV: '%s'; delay %ds" %
-                     (stats_csv_path, delay_s))
+        _logger.info(
+            "Writing extra stats to CSV: '%s'; %s" % (stats_csv_path, info))
     if distrib_path:
-        _logger.info("Writing full distributions to: '%s'; delay %ds" %
-                     (distrib_path, delay_s))
+        _logger.info(
+            "Writing full distributions to: '%s'; %s" % (distrib_path, info))
 
     num_requests = 0
+
+    if is_master:
+
+        def on_slave_report(client_id, data):
+            nonlocal num_requests
+            num_requests = collect_extra_stats(stats_csv_path, distrib_path,
+                                               num_requests)
+
+        locust.events.slave_report += on_slave_report
+        return
+
+    # Not master; polling.
     while True:
         num_requests = collect_extra_stats(stats_csv_path, distrib_path,
                                            num_requests)
