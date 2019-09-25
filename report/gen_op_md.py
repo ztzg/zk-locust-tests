@@ -20,29 +20,28 @@ _ls_key_labels = {
     'total_rps': 'Requests/s',
 }
 
-_zkm_plots = [{
-    'label': 'Outstanding Requests',
-    'name': 'outstanding_requests',
-    'metrics': ['outstanding_requests']
-},
-              {
-                  'label':
-                  'Clients',
-                  'name':
-                  'clients',
-                  'metrics':
-                  ['num_alive_connections', 'open_file_descriptor_count']
-              },
-              {
-                  'label': 'Nodes',
-                  'name': 'nodes',
-                  'metrics': ['znode_count', 'ephemerals_count']
-              },
-              {
-                  'label': 'Watches',
-                  'name': 'watch_count',
-                  'metrics': ['watch_count']
-              }]
+_zkm_plots = [
+    {
+        'label': 'Outstanding Requests',
+        'name': 'outstanding_requests',
+        'metrics': ['outstanding_requests']
+    },
+    {
+        'label': 'Clients',
+        'name': 'clients',
+        'metrics': ['num_alive_connections', 'open_file_descriptor_count']
+    },
+    {
+        'label': 'Nodes',
+        'name': 'nodes',
+        'metrics': ['znode_count', 'ephemerals_count']
+    },
+    {
+        'label': 'Watches',
+        'name': 'watch_count',
+        'metrics': ['watch_count']
+    }
+]  # yapf:disable
 
 
 def write_md(df, task_set, op, md_path, latencies_base_path,
