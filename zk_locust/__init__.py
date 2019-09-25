@@ -20,6 +20,8 @@ _zk_re_port = re.compile(r"(.*):(\d{1,4})$")
 
 
 def get_zk_hosts():
+    if not ZK_HOSTS:
+        raise ZKLocustException("No ZK_LOCUST_HOSTS connect string provided")
     return ZK_HOSTS
 
 
