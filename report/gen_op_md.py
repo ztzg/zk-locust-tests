@@ -1,12 +1,18 @@
 #!/usr/bin/env python3
 
 import sys
+import logging
+
 import numpy as np
 import pandas as pd
 import pandas.plotting
 import matplotlib.pyplot as plt
 
 pandas.plotting.register_matplotlib_converters()
+
+logging.basicConfig()
+_logger = logging.getLogger(__name__)
+# _logger.setLevel(logging.DEBUG)
 
 _savefig_exts = ['.svg', '.pdf']
 
@@ -119,18 +125,13 @@ def plot_user_count(df, user_count_base_path):
     plt.close(fig)
 
 
-def plot_num_requests(df, num_requests_base_path):
-    fig, axes = plt.subplots(nrows=2)
-
-    dt = [
-        delta.total_seconds()
-        for delta in df.index.to_series(keep_tz=True).diff()
-    ]
-    dnr_dt = df.num_requests.diff() / dt
+def plot_num_requests_per_1s(df, num_requests_base_path):
+    dnr_dt = df.num_requests.diff()
     dnr_dt[dnr_dt < 0] = np.nan
-    dnf_dt = df.num_failures.diff() / dt
+    dnf_dt = df.num_failures.diff()
     dnf_dt[dnf_dt < 0] = np.nan
 
+    fig, axes = plt.subplots(nrows=2)
     ax = axes[0]
 
     ax.plot(df.index, dnr_dt, label='Req./s')
@@ -151,6 +152,56 @@ def plot_num_requests(df, num_requests_base_path):
         fig.savefig(num_requests_base_path + ext)
 
     plt.close(fig)
+    return True
+
+
+def plot_num_requests_multi(df, num_requests_base_path):
+    if len(df) < 2:
+        return False
+
+    client_ids = df['client_id'].unique()
+
+    min_t, max_t = df.index.min(), df.index.max()
+    nidx = pd.date_range(min_t, max_t, freq='1s')
+    columns = ['num_requests', 'num_failures']
+
+    x_df = pd.DataFrame(index=nidx, columns=columns)
+    x_df = x_df.fillna(0)
+
+    for client_id in client_ids:
+        client_df = df.loc[df['client_id'] == client_id, columns]
+        client_df = client_df.reindex(
+            client_df.index.union(nidx)).interpolate().reindex(nidx)
+        x_df += client_df
+
+    x_df = x_df.cumsum()
+
+    return plot_num_requests_per_1s(x_df, num_requests_base_path)
+
+
+def plot_num_requests(df, num_requests_base_path):
+    clients_df = df.loc[:, ['client_id', 'num_requests', 'num_failures']]
+    clients_df = clients_df.dropna()
+
+    _logger.debug('plot_num_requests %d records, %d client records', len(df),
+                  len(clients_df))
+
+    if len(clients_df):
+        return plot_num_requests_multi(clients_df, num_requests_base_path)
+
+    df = df.loc[:, ['num_requests', 'num_failures']]
+    df = df.dropna()
+
+    if len(df) < 2:
+        return False
+
+    oidx = df.index
+    nidx = pd.date_range(oidx.min(), oidx.max(), freq='1s')
+
+    df = df.reindex(oidx.union(nidx)).interpolate().reindex(nidx)
+    # df = df.rolling(3).mean()
+
+    return plot_num_requests_per_1s(df, num_requests_base_path)
 
 
 def plot_zkm(df, plot_def, base_path):
@@ -180,21 +231,21 @@ def main(executable, ls_csv_path, zkm_csv_path, task_set_and_op, base_path):
     ls_df = pd.read_csv(ls_csv_path, index_col='timestamp', parse_dates=True)
     zkm_df = pd.read_csv(zkm_csv_path, index_col='timestamp', parse_dates=True)
 
+    ls_merged_df = ls_df[ls_df['client_id'].isna()]
+
     latencies_base_path = None
-    if len(ls_df) > 0:
+    if len(ls_merged_df) > 0:
         latencies_base_path = base_path + '_latencies'
-        plot_latencies(ls_df, latencies_base_path)
+        plot_latencies(ls_merged_df, latencies_base_path)
 
     user_count_base_path = None
-    if len(ls_df) > 0:
+    if len(ls_merged_df) > 0:
         user_count_base_path = base_path + '_user_count'
-        plot_user_count(ls_df, user_count_base_path)
+        plot_user_count(ls_merged_df, user_count_base_path)
 
-    if ls_df.shape[0] < 2:
+    num_requests_base_path = base_path + '_num_requests'
+    if not plot_num_requests(ls_df, num_requests_base_path):
         num_requests_base_path = None
-    else:
-        num_requests_base_path = base_path + '_num_requests'
-        plot_num_requests(ls_df, num_requests_base_path)
 
     zkm_plot_infos = []
     if len(zkm_df) > 0:
