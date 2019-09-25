@@ -125,15 +125,21 @@ fi
 # Locust invocation.
 
 if [ -z "$multi_count" ]; then
+    set +e
     locust "$@" "${extra_locust_args[@]}"
 else
     if [ -z "$multi_workdir" ]; then
         multi_workdir="$(mktemp -d)"
         trap "rm -rf '$multi_workdir'" EXIT
     fi
+    set +e
     "$ZK_LOCUST_TESTS/multi-locust.sh" "$multi_count" "$multi_workdir" \
         "$@" "${extra_locust_args[@]}"
 fi
+
+locust_status="$?"
+
+set -e
 
 # Report generation.
 
@@ -145,3 +151,5 @@ if [ -d "$report_dir" ]; then
         --stats-csv "$LOCUST_EXTRA_STATS_CSV" \
         "${extra_report_args[@]}"
 fi
+
+exit "$locust_status"
