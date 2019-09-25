@@ -65,14 +65,14 @@ subsets.mk:					\
 %/task_set.md:					\
 		$(TASK_SET_FRAGMENTS)
 	@echo '  FRAGMENT $*'
-	cat $(patsubst %.fragment.done,%.md,$(filter $*/%,$(TASK_SET_FRAGMENTS))) >$@.tmp
+	cat /dev/null $(patsubst %.fragment.done,%.md,$(filter $*/%,$(TASK_SET_FRAGMENTS))) >$@.tmp
 	@mv $@.tmp $@
 
 report.md: $(TASK_SET_MDS)
 	@echo '  REPORT   $@'
 	echo '# Report' >$@.tmp
 	echo >>$@.tmp
-	cat $(TASK_SET_MDS) >>$@.tmp
+	cat /dev/null $(TASK_SET_MDS) >>$@.tmp
 	@mv $@.tmp $@
 
 report.html: report.md
