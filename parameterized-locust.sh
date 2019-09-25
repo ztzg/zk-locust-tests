@@ -53,6 +53,7 @@ multi_count=
 multi_workdir=
 extra_locust_args=()
 extra_report_args=()
+force=
 
 while [ -z "$dashdash" -a "$#" -gt '0' ]; do
     case "$1" in
@@ -94,6 +95,10 @@ while [ -z "$dashdash" -a "$#" -gt '0' ]; do
             extra_report_args+=(-j "$2")
             shift 2
             ;;
+        --force)
+            force="$1"
+            shift 1
+            ;;
         --)
             dashdash="$1"
             shift
@@ -108,7 +113,12 @@ done
 
 if [ -n "$report_dir" ]; then
     if [ -d "$report_dir" ]; then
-        die "Refusing to touch existing report directory '$report_dir'."
+        is_empty="$(find "$report_dir" -maxdepth 0 -empty)"
+        if [ -z "$is_empty" -a -z "$force" ]; then
+            die "Refusing to touch existing report directory '$report_dir'."
+        fi
+    elif [ -e "$report_dir" ]; then
+        die "Refusing to touch existing '$report_dir'."
     fi
 
     mkdir -p "$report_dir"
