@@ -52,7 +52,7 @@ def metrics_collect_loop(zk_host_port, url, delay_s):
             r = requests.get(url, allow_redirects=False, stream=False)
             r.raise_for_status()
             maybe_write_metrics_csv(zk_host_port, r.content)
-        except requests.exceptions.HTTPError:
+        except Exception:
             _logger.exception('Metrics collect loop')
         gevent.sleep(delay_s)
 
