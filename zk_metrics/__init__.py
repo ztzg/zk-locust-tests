@@ -56,7 +56,7 @@ def metrics_collect_loop(zk_host_port, url, delay_s):
             r.raise_for_status()
             maybe_write_metrics_csv(zk_host_port, r.content)
         except requests.ConnectionError:
-            pass
+            maybe_write_metrics_csv(zk_host_port, None)
         except Exception:
             _logger.exception('Metrics collect loop')
         gevent.sleep(delay_s)

@@ -21,15 +21,17 @@ def write_metrics_csv(host_port, data, csv_path):
     if not output.f:
         return
 
-    tree = json.loads(data)
+    tree = json.loads(data) if data else None
 
     if not hasattr(output, 'keys'):
+        if not tree or tree.get('error'):
+            return
         with output.lock:
             if not hasattr(output, 'keys'):
                 write_metrics_csv_meta_locked(output, tree)
 
     for key in output.keys:
-        value = tree.get(key)
+        value = tree.get(key) if tree else None
         if value is None:
             row.append('')
         else:
