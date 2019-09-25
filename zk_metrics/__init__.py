@@ -47,11 +47,16 @@ def metrics_collect_loop(zk_host_port, url, delay_s):
                   locust.runners.SlaveLocustRunner):
         return
 
+    http_session = requests.Session()
+    http_session.get_adapter(url).max_retries = 1
+
     while True:
         try:
-            r = requests.get(url, allow_redirects=False, stream=False)
+            r = http_session.get(url, allow_redirects=False, stream=False)
             r.raise_for_status()
             maybe_write_metrics_csv(zk_host_port, r.content)
+        except requests.ConnectionError:
+            pass
         except Exception:
             _logger.exception('Metrics collect loop')
         gevent.sleep(delay_s)
