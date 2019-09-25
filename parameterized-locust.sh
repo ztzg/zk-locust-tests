@@ -25,6 +25,9 @@ unset KAZOO_LOCUST_SASL_OPTIONS
 unset ZK_LOCUST_ZK_METRICS_COLLECT
 unset ZK_LOCUST_ZK_METRICS_CSV
 
+unset ZK_DISPATCH_CONFIG
+unset ZK_DISPATCH_PROGRAM
+
 unset LOCUST_EXTRA_STATS_CSV
 unset LOCUST_EXTRA_STATS_DISTRIB
 unset LOCUST_EXTRA_STATS_COLLECT
@@ -71,6 +74,10 @@ while [ -z "$dashdash" -a "$#" -gt '0' ]; do
             ;;
         --stats-csv|--stats-distrib|--stats-collect)
             set_var 'LOCUST_EXTRA_' "${1:2}" "$2"
+            shift 2
+            ;;
+        --zk-dispatch-config|--zk-dispatch-program)
+            set_var '' "${1:2}" "$2"
             shift 2
             ;;
         --bench-*)
