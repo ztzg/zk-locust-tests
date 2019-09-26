@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 
 import sys
+import os.path
 import logging
+import json
 
 import numpy as np
 import pandas as pd
@@ -9,6 +11,8 @@ import pandas.plotting
 import matplotlib.pyplot as plt
 
 pandas.plotting.register_matplotlib_converters()
+
+_colors = [c["color"] for c in list(plt.rcParams["axes.prop_cycle"])]
 
 logging.basicConfig()
 _logger = logging.getLogger(__name__)
@@ -48,6 +52,35 @@ _zkm_plots = [
         'metrics': ['watch_count']
     }
 ]  # yapf:disable
+
+
+class Group(object):
+    def __init__(self, sample_id, ls_df, zkm_df):
+        self.sample_id = sample_id
+        self.ls_df = ls_df
+        self.zkm_df = zkm_df
+        self._client_ids = None
+        self._ls_merged_df = None
+        self._ls_unmerged_df = None
+
+    def client_ids(self):
+        if self._client_ids is None:
+            df = self.unmerged_client_stats()
+            self._client_ids = df['client_id'].unique()
+        return self._client_ids
+
+    def merged_client_stats(self):
+        if self._ls_merged_df is None:
+            pick = self.ls_df['client_id'].isna()
+            self._ls_merged_df = self.ls_df[pick]
+        return self._ls_merged_df
+
+    def unmerged_client_stats(self):
+        if self._ls_unmerged_df is None:
+            self._ls_unmerged_df = self.ls_df.loc[:, [
+                'client_id', 'num_requests', 'num_failures'
+            ]].dropna()
+        return self._ls_unmerged_df
 
 
 def write_md(df, task_set, op, md_path, latencies_base_path,
@@ -96,16 +129,29 @@ def write_md(df, task_set, op, md_path, latencies_base_path,
         f.write('\n')
 
 
-def plot_latencies(df, latencies_base_path):
+def plot_latencies(groups, latencies_base_path):
     fig = plt.figure()
     ax = fig.gca()
 
-    for pc in ['66%', '75%', '80%', '90%', '98%', '99%', '100%']:
-        ax.fill_between(df.index, 0, df[pc], facecolor='blue', alpha=0.1)
+    is_relative = len(groups) > 1
 
-    df.plot.line(y='50%', color='blue', ax=ax)
-    df.plot.line(y='95%', color='blue', linestyle='--', ax=ax)
-    df.plot.line(y='100%', color='blue', linestyle=':', ax=ax)
+    for i in range(len(groups)):
+        is_main = i == 0
+        df = groups[i].merged_client_stats()
+        color = _colors[i % len(_colors)]
+
+        if is_relative:
+            nidx = (df.index - df.index.min()).total_seconds()
+            df = df.set_index(nidx)
+
+        if is_main:
+            for pc in ['66%', '75%', '80%', '90%', '98%', '99%', '100%']:
+                ax.fill_between(
+                    df.index, 0, df[pc], facecolor=color, alpha=0.1)
+
+        df.plot.line(y='50%', color=color, ax=ax)
+        df.plot.line(y='95%', color=color, linestyle='--', ax=ax)
+        df.plot.line(y='100%', color=color, linestyle=':', ax=ax)
 
     for ext in _savefig_exts:
         fig.savefig(latencies_base_path + ext)
@@ -125,22 +171,42 @@ def plot_user_count(df, user_count_base_path):
     plt.close(fig)
 
 
-def plot_num_requests_per_1s(df, num_requests_base_path):
-    dnr_dt = df.num_requests.diff()
-    dnr_dt[dnr_dt < 0] = np.nan
-    dnf_dt = df.num_failures.diff()
-    dnf_dt[dnf_dt < 0] = np.nan
-
+def plot_num_requests_per_1s(dfs, num_requests_base_path):
     fig, axes = plt.subplots(nrows=2)
     ax = axes[0]
 
-    ax.plot(df.index, dnr_dt, label='Req./s')
+    is_relative = len(dfs) > 1
+
+    if is_relative:
+        for i in range(len(dfs)):
+            df = dfs[i]
+            nidx = (df.index - df.index.min()).total_seconds()
+            dfs[i] = df.set_index(nidx)
+
+    for i in range(len(dfs)):
+        df = dfs[i]
+        color = _colors[i % len(_colors)]
+
+        dnr_dt = df.num_requests.diff()
+        dnr_dt[dnr_dt < 0] = np.nan
+
+        ax.plot(df.index, dnr_dt, label='Req./s', color=color)
+
     ax.legend()
     ax.xaxis.label.set_visible(False)
     ax.tick_params(axis='x', which='both', labelbottom=False)
 
     ax = axes[1]
-    ax.plot(df.index, dnf_dt, label='Fail/s')
+
+    for i in range(len(dfs)):
+        df = dfs[i]
+        color = _colors[i % len(_colors)]
+
+        dnf_dt = df.num_failures.diff()
+        dnf_dt[dnf_dt < 0] = np.nan
+
+        ax.plot(df.index, dnf_dt, label='Fail/s', color=color)
+
     ax.legend()
 
     for label in ax.get_xticklabels():
@@ -155,53 +221,99 @@ def plot_num_requests_per_1s(df, num_requests_base_path):
     return True
 
 
-def plot_num_requests_multi(df, num_requests_base_path):
-    if len(df) < 2:
-        return False
-
-    client_ids = df['client_id'].unique()
-
-    min_t, max_t = df.index.min(), df.index.max()
-    nidx = pd.date_range(min_t, max_t, freq='1s')
+def plot_num_requests_multi(groups, num_requests_base_path):
     columns = ['num_requests', 'num_failures']
 
-    x_df = pd.DataFrame(index=nidx, columns=columns)
-    x_df = x_df.fillna(0)
+    sel_groups = []
 
-    for client_id in client_ids:
-        client_df = df.loc[df['client_id'] == client_id, columns]
-        client_df = client_df.reindex(
-            client_df.index.union(nidx)).interpolate().reindex(nidx)
-        x_df += client_df
+    for group in groups:
+        df = group.unmerged_client_stats()
 
-    x_df = x_df.cumsum()
+        if len(df) < 2:
+            continue
 
-    return plot_num_requests_per_1s(x_df, num_requests_base_path)
+        sel_groups.append(group)
 
-
-def plot_num_requests(df, num_requests_base_path):
-    clients_df = df.loc[:, ['client_id', 'num_requests', 'num_failures']]
-    clients_df = clients_df.dropna()
-
-    _logger.debug('plot_num_requests %d records, %d client records', len(df),
-                  len(clients_df))
-
-    if len(clients_df):
-        return plot_num_requests_multi(clients_df, num_requests_base_path)
-
-    df = df.loc[:, ['num_requests', 'num_failures']]
-    df = df.dropna()
-
-    if len(df) < 2:
+    if len(sel_groups) == 0:
         return False
 
-    oidx = df.index
-    nidx = pd.date_range(oidx.min(), oidx.max(), freq='1s')
+    is_relative = len(sel_groups) > 1
 
-    df = df.reindex(oidx.union(nidx)).interpolate().reindex(nidx)
-    # df = df.rolling(3).mean()
+    dfs = []
 
-    return plot_num_requests_per_1s(df, num_requests_base_path)
+    for i in range(len(sel_groups)):
+        group = sel_groups[i]
+        df = group.unmerged_client_stats()
+        client_ids = group.client_ids()
+
+        min_t = df.index.min()
+        max_t = df.index.max()
+        nidx = pd.date_range(min_t, max_t, freq='1s')
+
+        x_df = pd.DataFrame(index=nidx, columns=columns)
+        x_df = x_df.fillna(0)
+
+        for client_id in client_ids:
+            client_df = df.loc[df['client_id'] == client_id, columns]
+
+            client_df = client_df.reindex(
+                client_df.index.union(nidx)).interpolate().reindex(nidx)
+            x_df += client_df
+
+        x_df = x_df.cumsum()
+
+        if is_relative:
+            ridx = x_df.index - x_df.index.min()
+            x_df = x_df.set_index(ridx)
+
+        dfs.append(x_df)
+
+    return plot_num_requests_per_1s(dfs, num_requests_base_path)
+
+
+def plot_num_requests(groups, num_requests_base_path):
+    can_multi = True
+    for group in groups:
+        clients_df = group.unmerged_client_stats()
+        if not len(clients_df):
+            can_multi = False
+            break
+
+    if can_multi:
+        return plot_num_requests_multi(groups, num_requests_base_path)
+
+    dfs = []
+    min_t = None
+    max_t = None
+
+    for group in groups:
+        df = group.merged_client_stats()
+        df = df.loc[:, ['num_requests', 'num_failures']]
+        df = df.dropna()
+
+        if len(df) < 2:
+            continue
+
+        dfs.append(df)
+        df_min_t = df.index.min()
+        df_max_t = df.index.max()
+        if min_t is None or df_min_t < min_t:
+            min_t = df_min_t
+        if max_t is None or df_max_t > max_t:
+            max_t = df_max_t
+
+    if len(dfs) == 0:
+        return False
+
+    nidx = pd.date_range(min_t, max_t, freq='1s')
+
+    for i in range(len(dfs)):
+        df = dfs[i]
+        df = df.reindex(df.index.union(nidx)).interpolate().reindex(nidx)
+        # df = df.rolling(3).mean()
+        dfs[i] = df
+
+    return plot_num_requests_per_1s(dfs, num_requests_base_path)
 
 
 def plot_zkm(df, plot_def, base_path):
@@ -226,17 +338,15 @@ def plot_zkm(df, plot_def, base_path):
     return (plot_def['label'], plot_path)
 
 
-def main(executable, ls_csv_path, zkm_csv_path, stem, base_path):
-    task_set, op = stem.split('/')[-2:]
-    ls_df = pd.read_csv(ls_csv_path, index_col='timestamp', parse_dates=True)
-    zkm_df = pd.read_csv(zkm_csv_path, index_col='timestamp', parse_dates=True)
-
-    ls_merged_df = ls_df[ls_df['client_id'].isna()]
+def process_task_set_op_single(task_set, op, group, base_path, md_path):
+    ls_df = group.ls_df
+    zkm_df = group.zkm_df
+    ls_merged_df = group.merged_client_stats()
 
     latencies_base_path = None
     if len(ls_merged_df) > 0:
         latencies_base_path = base_path + '_latencies'
-        plot_latencies(ls_merged_df, latencies_base_path)
+        plot_latencies([group], latencies_base_path)
 
     user_count_base_path = None
     if len(ls_merged_df) > 0:
@@ -244,7 +354,7 @@ def main(executable, ls_csv_path, zkm_csv_path, stem, base_path):
         plot_user_count(ls_merged_df, user_count_base_path)
 
     num_requests_base_path = base_path + '_num_requests'
-    if not plot_num_requests(ls_df, num_requests_base_path):
+    if not plot_num_requests([group], num_requests_base_path):
         num_requests_base_path = None
 
     zkm_plot_infos = []
@@ -253,8 +363,64 @@ def main(executable, ls_csv_path, zkm_csv_path, stem, base_path):
             zkm_plot_info = plot_zkm(zkm_df, zkm_plot, base_path)
             zkm_plot_infos.append(zkm_plot_info)
 
-    write_md(ls_df, task_set, op, base_path + '.md', latencies_base_path,
+    write_md(ls_df, task_set, op, md_path, latencies_base_path,
              user_count_base_path, num_requests_base_path, zkm_plot_infos)
+
+
+def process_task_set_op_multi(task_set, op, groups, base_path, md_path):
+    latencies_base_path = None
+    latencies_groups = []
+    for group in groups:
+        if len(group.merged_client_stats()) > 0:
+            latencies_base_path = base_path + '_latencies'
+            latencies_groups.append(group)
+
+    if latencies_base_path:
+        plot_latencies(latencies_groups, latencies_base_path)
+
+    num_requests_base_path = base_path + '_num_requests'
+    if not plot_num_requests(groups, num_requests_base_path):
+        num_requests_base_path = None
+
+
+def load_group(base_input_path, data_item):
+    sample_id = data_item.get('id') or None
+    ls_csv_path = os.path.join(base_input_path, data_item['locust-stats'])
+    ls_df = pd.read_csv(ls_csv_path, index_col=0, parse_dates=True)
+    zkm_csv_path = os.path.join(base_input_path, data_item['zk-metrics'])
+    zkm_df = pd.read_csv(zkm_csv_path, index_col=0, parse_dates=True)
+
+    return Group(sample_id, ls_df, zkm_df)
+
+
+def process_task_set_op(base_input_path, task_set, op, data, base_path,
+                        md_path):
+    groups = [load_group(base_input_path, data_item) for data_item in data]
+
+    if len(groups) == 1:
+        process_task_set_op_single(task_set, op, groups[0], base_path, md_path)
+    else:
+        process_task_set_op_multi(task_set, op, groups, base_path, md_path)
+
+
+def process_fragments(base_input_path, fragments, base_path, md_path):
+    frag_dict = {}
+    for fragment in fragments:
+        key = (fragment['task_set'], fragment['op'])
+        frag_dict[key] = frag_dict.get(key, []) + fragment['data']
+
+    for (task_set, op), data in frag_dict.items():
+        process_task_set_op(base_input_path, task_set, op, data, base_path,
+                            md_path)
+
+
+def main(executable, metadata, base_path, md_path):
+    with open(metadata) as f:
+        lines = f.readlines()
+
+    fragments = [json.loads(line) for line in lines]
+
+    process_fragments('.', fragments, base_path, md_path)
 
 
 if __name__ == '__main__':
