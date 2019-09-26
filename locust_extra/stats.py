@@ -8,7 +8,7 @@ import gevent
 
 import locust.runners
 import locust.events
-from locust.stats import sort_stats
+from locust.stats import sort_stats, StatsEntry
 
 from .output import format_timestamp, ensure_output
 
@@ -19,9 +19,11 @@ _distrib_path = os.getenv('LOCUST_EXTRA_STATS_DISTRIB')
 _delay_ms = int(os.getenv('LOCUST_EXTRA_STATS_COLLECT', '0'))
 
 _percentiles = [0.5, 0.66, 0.75, 0.80, 0.90, 0.95, 0.98, 0.99, 1.00]
+_no_percentiles = [None for f in _percentiles]
 
 _columns = [
     'timestamp',
+    'client_id',
     'method',
     'name',
     'num_requests',
@@ -42,9 +44,17 @@ def write_csv_header_locked(output):
     output.num_requests = 0
 
 
-def write_csv_row(timestamp, s, user_count, output):
+def write_csv_row(timestamp, client_id, s, user_count, output):
+    if client_id:
+        total_rps = None
+        pcs = _no_percentiles
+    else:
+        total_rps = s.total_rps
+        pcs = [s.get_response_time_percentile(f) for f in _percentiles]
+
     row = [
         timestamp,
+        client_id,
         s.method,
         s.name,
         s.num_requests,
@@ -54,9 +64,9 @@ def write_csv_row(timestamp, s, user_count, output):
         s.min_response_time or 0,
         s.max_response_time,
         s.avg_content_length,
-        s.total_rps,
+        total_rps,
         user_count,
-    ] + [s.get_response_time_percentile(f) for f in _percentiles]
+    ] + pcs
 
     with output.lock:
         output.w.writerow(row)
@@ -90,7 +100,8 @@ def write_jsonl_entry(timestamp, s, user_count, errors, output):
         output.f.flush()
 
 
-def collect_extra_stats(stats_csv_path, distrib_path, last_num_requests):
+def collect_extra_stats(stats_csv_path, distrib_path, client_id, client_data,
+                        last_num_requests):
     timestamp = format_timestamp()
 
     locust_runner = locust.runners.locust_runner
@@ -123,10 +134,25 @@ def collect_extra_stats(stats_csv_path, distrib_path, last_num_requests):
             if not hasattr(stats_output, 'keys'):
                 write_csv_header_locked(stats_output)
 
+    client_entries = None
+    if stats_output and client_id and client_data:
+        client_entries = {}
+        for stats_data in client_data["stats"]:
+            entry = StatsEntry.unserialize(stats_data)
+            request_key = (entry.name, entry.method)
+            client_entries[request_key] = entry
+
     request_stats = sort_stats(locust_runner.request_stats)
     for s in chain(request_stats, [total]):
         if stats_output:
-            write_csv_row(timestamp, s, user_count, stats_output)
+            if client_entries:
+                request_key = (s.name, s.method)
+                entry = client_entries.get(request_key)
+                if entry:
+                    write_csv_row(timestamp, client_id, entry, None,
+                                  stats_output)
+
+            write_csv_row(timestamp, None, s, user_count, stats_output)
 
         if distrib_output:
             write_jsonl_entry(timestamp, s, user_count,
@@ -164,15 +190,16 @@ def collect_extra_stats_loop(stats_csv_path, distrib_path, delay_s):
         def on_slave_report(client_id, data):
             nonlocal num_requests
             num_requests = collect_extra_stats(stats_csv_path, distrib_path,
-                                               num_requests)
+                                               client_id, data, num_requests)
 
         locust.events.slave_report += on_slave_report
+        # We are now hooked; let's abandon the greenlet.
         return
 
     # Not master; polling.
     while True:
-        num_requests = collect_extra_stats(stats_csv_path, distrib_path,
-                                           num_requests)
+        num_requests = collect_extra_stats(stats_csv_path, distrib_path, None,
+                                           None, num_requests)
         gevent.sleep(delay_s)
 
 
