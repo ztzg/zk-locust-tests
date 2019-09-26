@@ -9,6 +9,9 @@ $(V).SILENT:
 
 -include $(FRAGS_DIR)/subsets.mk
 
+TASK_SET_EXTRACTS =							\
+	$(addprefix $(FRAGS_DIR)/,$(addsuffix				\
+		.ls_subset.csv .zkm_subset.csv,$(TASK_SET_OPS)))
 TASK_SET_FRAGMENTS = \
 	$(addprefix $(FRAGS_DIR)/,$(addsuffix .fragment.done,$(TASK_SET_OPS)))
 TASK_SET_MDS = \
@@ -21,6 +24,9 @@ $(warning TASK_SET_MDS $(TASK_SET_MDS))
 report:						\
 		report.html			\
 		report.pdf
+
+.PHONY: extracts
+extracts: $(TASK_SET_EXTRACTS)
 
 $(FRAGS_DIR)/subsets.mk:			\
 		$(LOCUST_EXTRA_STATS_CSV)	\
