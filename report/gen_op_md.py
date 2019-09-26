@@ -35,7 +35,7 @@ _zkm_plots = [
     {
         'label': 'Clients',
         'name': 'clients',
-        'metrics': ['num_alive_connections', 'open_file_descriptor_count']
+        'metrics': ['num_alive_connections']
     },
     {
         'label': 'Nodes',
