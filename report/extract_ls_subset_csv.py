@@ -4,8 +4,8 @@ import sys
 import pandas as pd
 
 
-def main(executable, csv_path, task_set_and_op, subset_csv_path):
-    task_set, op = task_set_and_op.split('/')[-2:]
+def main(executable, csv_path, stem, subset_csv_path):
+    task_set, op = stem.split('/')[-2:]
     df = pd.read_csv(csv_path, index_col='timestamp', parse_dates=True)
 
     task_set_idx = df.name == task_set

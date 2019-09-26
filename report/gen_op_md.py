@@ -226,8 +226,8 @@ def plot_zkm(df, plot_def, base_path):
     return (plot_def['label'], plot_path)
 
 
-def main(executable, ls_csv_path, zkm_csv_path, task_set_and_op, base_path):
-    task_set, op = task_set_and_op.split('/')[-2:]
+def main(executable, ls_csv_path, zkm_csv_path, stem, base_path):
+    task_set, op = stem.split('/')[-2:]
     ls_df = pd.read_csv(ls_csv_path, index_col='timestamp', parse_dates=True)
     zkm_df = pd.read_csv(zkm_csv_path, index_col='timestamp', parse_dates=True)
 

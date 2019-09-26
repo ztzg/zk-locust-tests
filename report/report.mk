@@ -3,22 +3,30 @@ SCRIPT_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 LOCUST_EXTRA_STATS_CSV = locust-stats.csv
 ZK_LOCUST_ZK_METRICS_CSV = zk-metrics.csv
 
+FRAGS_DIR = fragments
+
 $(V).SILENT:
 
--include subsets.mk
+-include $(FRAGS_DIR)/subsets.mk
 
-TASK_SET_FRAGMENTS = $(addsuffix .fragment.done,$(TASK_SET_OPS))
-TASK_SET_MDS = $(addsuffix /task_set.md,$(TASK_SETS))
+TASK_SET_FRAGMENTS = \
+	$(addprefix $(FRAGS_DIR)/,$(addsuffix .fragment.done,$(TASK_SET_OPS)))
+TASK_SET_MDS = \
+	$(addprefix $(FRAGS_DIR)/,$(addsuffix /task_set.md,$(TASK_SETS)))
+
+$(warning TASK_SET_FRAGMENTS $(TASK_SET_FRAGMENTS))
+$(warning TASK_SET_MDS $(TASK_SET_MDS))
 
 .PHONY: report
 report:						\
 		report.html			\
 		report.pdf
 
-subsets.mk:					\
+$(FRAGS_DIR)/subsets.mk:			\
 		$(LOCUST_EXTRA_STATS_CSV)	\
 		$(SCRIPT_DIR)/gen_subsets_mk.py
 	@echo '  SUBSETS'
+	@mkdir -p $(dir $@)
 	$(SCRIPT_DIR)/gen_subsets_mk.py TASK_SETS TASK_SET_OPS $< >$@.tmp
 	@mv $@.tmp $@
 
