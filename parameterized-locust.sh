@@ -20,6 +20,7 @@ unset ZK_LOCUST_KEY_SIZE
 unset ZK_LOCUST_VAL_SIZE
 
 unset KAZOO_LOCUST_HANDLER
+unset KAZOO_LOCUST_TIMEOUT_S
 unset KAZOO_LOCUST_SASL_OPTIONS
 
 unset ZK_LOCUST_ZK_METRICS_COLLECT
@@ -64,7 +65,7 @@ while [ -z "$dashdash" -a "$#" -gt '0' ]; do
             set_var 'ZK_LOCUST_' "${1:2}" "$2"
             shift 2
             ;;
-        --kazoo-handler|--kazoo-sasl-options)
+        --kazoo-handler|--kazoo-sasl-options|--kazoo-timeout-s)
             set_var 'KAZOO_LOCUST_' "${1:8}" "$2"
             shift 2
             ;;

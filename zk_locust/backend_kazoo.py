@@ -29,17 +29,18 @@ class KazooLocustStoppedException(KazooLocustException):
     pass
 
 
-_default_handler = os.getenv('KAZOO_LOCUST_HANDLER')
+_global_handler = os.getenv('KAZOO_LOCUST_HANDLER')
+_global_timeout_s = os.getenv('KAZOO_LOCUST_TIMEOUT_S')
 
 
-def fetch_default_sasl_options():
+def fetch_global_sasl_options():
     s = os.getenv('KAZOO_LOCUST_SASL_OPTIONS')
     if not s:
         return None
     return json.loads(s)
 
 
-_default_sasl_options = fetch_default_sasl_options()
+_global_sasl_options = fetch_global_sasl_options()
 
 
 class KazooLocustClient(AbstractZKLocustClient):
@@ -50,8 +51,9 @@ class KazooLocustClient(AbstractZKLocustClient):
     def __init__(self,
                  hosts,
                  pseudo_root,
-                 handler=_default_handler,
-                 sasl_options=_default_sasl_options,
+                 handler=_global_handler,
+                 sasl_options=_global_sasl_options,
+                 timeout=None,
                  autostart=True):
         super(KazooLocustClient, self).__init__(pseudo_root=pseudo_root)
 
@@ -72,6 +74,11 @@ class KazooLocustClient(AbstractZKLocustClient):
                 raise KazooLocustArgumentsException(
                     "Unknown value for 'handler': %s" % (handler))
             kwargs['handler'] = inst
+
+        if timeout is None and _global_timeout_s:
+            timeout = float(_global_timeout_s)
+        if timeout is not None:
+            kwargs['timeout'] = timeout
 
         self._set_zk_client(kazoo.client.KazooClient(hosts=hosts, **kwargs))
 
