@@ -83,8 +83,16 @@ class Group(object):
         return self._ls_unmerged_df
 
 
+class FigureInfo(object):
+    def __init__(self, title, naked_path, exts):
+        self.title = title
+        self.naked_path = naked_path
+        self.exts = exts
+
+
 def write_md(df, task_set, op, md_path, latencies_base_path,
-             user_count_base_path, num_requests_base_path, zkm_plot_infos):
+             user_count_base_path, num_requests_base_path, errors_fig_infos,
+             zkm_plot_infos):
     with open(md_path, 'w') as f:
         f.write("## Task set '%s', op '%s'\n\n" % (task_set, op))
 
@@ -112,13 +120,19 @@ def write_md(df, task_set, op, md_path, latencies_base_path,
 
         f.write('\n### Other Metrics\n\n')
 
-        if user_count_base_path:
-            f.write('\n#### Client Count\n\n')
-            f.write('\n![](%s)\n' % user_count_base_path)
+        if errors_fig_infos:
+            f.write('#### Errors\n\n')
+            for fig in errors_fig_infos:
+                f.write('##### %s\n\n' % fig.title)
+                f.write('\n![](%s)\n\n' % fig.naked_path)
 
         if num_requests_base_path:
             f.write('\n#### Requests\n\n')
             f.write('\n![](%s)\n' % num_requests_base_path)
+
+        if user_count_base_path:
+            f.write('\n#### Client Count\n\n')
+            f.write('\n![](%s)\n' % user_count_base_path)
 
         if len(zkm_plot_infos) > 0:
             f.write('\n### ZooKeeper Metrics\n\n')
@@ -335,6 +349,73 @@ def plot_zkm(df, plot_def, base_path):
     return (plot_def['label'], plot_path)
 
 
+def process_errors(groups, base_path):
+    if len(groups) != 1:
+        return None
+
+    df = groups[0].ls_df
+    df = df[df.client_id.notnull()]
+
+    if not len(df):
+        return None
+
+    encoded_errors = df.errors.fillna('')
+    deserialized = []
+    keys = set()
+    for error_json in encoded_errors:
+        if not error_json:
+            deserialized.append({})
+            continue
+
+        error_data = json.loads(error_json)
+        deserialized.append(error_data)
+        keys |= error_data.keys()
+
+    if not len(keys):
+        return None
+
+    new_columns = {}
+    for key in keys:
+        column_name = key
+        new_columns[column_name] = pd.Series(
+            name=column_name, index=df.index, data=0)
+
+    for i in range(len(encoded_errors)):
+        error_data = deserialized[i]
+        for key in keys:
+            count = error_data.get(key)
+            if not count:
+                continue
+
+            column_name = key
+            s = new_columns[column_name]
+            s[df.index[i]] = count
+
+    fig_infos = []
+
+    for column in new_columns.values():
+        data = {'client_id': df.client_id, column.name: column}
+
+        x_df = pd.DataFrame(data)
+
+        fig, ax = plt.subplots()
+
+        x_df.groupby('client_id').plot(y=column.name, ax=ax, legend=False)
+
+        naked_path = base_path
+        if fig_infos:
+            naked_path = naked_path + '_' + str(len(fig_infos))
+
+        for ext in _savefig_exts:
+            fig.savefig(naked_path + ext)
+
+        fig_infos.append(FigureInfo(column.name, naked_path, _savefig_exts))
+
+        plt.close(fig)
+
+    return fig_infos
+
+
 def process_task_set_op_single(task_set, op, group, base_path, md_path):
     ls_df = group.ls_df
     zkm_df = group.zkm_df
@@ -354,6 +435,8 @@ def process_task_set_op_single(task_set, op, group, base_path, md_path):
     if not plot_num_requests([group], num_requests_base_path):
         num_requests_base_path = None
 
+    errors_fig_infos = process_errors([group], base_path + '_errors')
+
     zkm_plot_infos = []
     if len(zkm_df) > 0:
         for zkm_plot in _zkm_plots:
@@ -361,7 +444,8 @@ def process_task_set_op_single(task_set, op, group, base_path, md_path):
             zkm_plot_infos.append(zkm_plot_info)
 
     write_md(ls_df, task_set, op, md_path, latencies_base_path,
-             user_count_base_path, num_requests_base_path, zkm_plot_infos)
+             user_count_base_path, num_requests_base_path, errors_fig_infos,
+             zkm_plot_infos)
 
 
 def process_task_set_op_multi(task_set, op, groups, base_path, md_path):
