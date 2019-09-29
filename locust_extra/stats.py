@@ -35,6 +35,7 @@ _columns = [
     'avg_content_length',
     'total_rps',
     'user_count',
+    'errors',
 ] + ["%.2d%%" % int(f * 100) for f in _percentiles]
 
 
@@ -44,13 +45,17 @@ def write_csv_header_locked(output):
     output.num_requests = 0
 
 
-def write_csv_row(timestamp, client_id, s, user_count, output):
+def write_csv_row(timestamp, client_id, s, e, user_count, output):
     if client_id:
         total_rps = None
         pcs = _no_percentiles
     else:
         total_rps = s.total_rps
         pcs = [s.get_response_time_percentile(f) for f in _percentiles]
+
+    errors_json = None
+    if e:
+        errors_json = json.dumps(e, ensure_ascii=True, indent=None)
 
     row = [
         timestamp,
@@ -66,6 +71,7 @@ def write_csv_row(timestamp, client_id, s, user_count, output):
         s.avg_content_length,
         total_rps,
         user_count,
+        errors_json,
     ] + pcs
 
     with output.lock:
@@ -73,7 +79,7 @@ def write_csv_row(timestamp, client_id, s, user_count, output):
         output.f.flush()
 
 
-def write_jsonl_entry(timestamp, s, user_count, errors, output):
+def write_jsonl_entry(timestamp, s, e, user_count, output):
     info = {
         'timestamp': timestamp,
         'method': s.method,
@@ -90,14 +96,52 @@ def write_jsonl_entry(timestamp, s, user_count, errors, output):
         'response_times': s.response_times
     }
 
-    if errors:
-        info['errors'] = errors
+    if e:
+        info['errors'] = e
 
     s = json.dumps(info, ensure_ascii=True, indent=None)
 
     with output.lock:
         output.f.write(s + '\n')
         output.f.flush()
+
+
+def _classify_errors(errors_data):
+    errors = {}
+    for e_data in errors_data:
+        op_key = (e_data['name'], e_data['method'])
+
+        op_data = errors.get(op_key)
+        if not op_data:
+            errors[op_key] = op_data = {}
+
+        e_key = e_data['error']
+        op_data[e_key] = op_data.get(e_key, 0) + e_data['occurences']
+    return errors
+
+
+class ClientStats(object):
+    def __init__(self, total, stats, errors):
+        self.total = total
+        self.stats = stats
+        self.errors = errors
+
+    def stats_for(self, key):
+        return self.stats.get(key)
+
+    def errors_for(self, key):
+        return self.errors.get(key)
+
+    @classmethod
+    def from_client_data(cls, data):
+        total = StatsEntry.unserialize(data["stats_total"])
+        stats = {}
+        for stats_data in data["stats"]:
+            entry = StatsEntry.unserialize(stats_data)
+            key = (entry.name, entry.method)
+            stats[key] = entry
+        errors = _classify_errors(data["errors"].values())
+        return cls(total, stats, errors)
 
 
 def collect_extra_stats(stats_csv_path, distrib_path, client_id, client_data,
@@ -108,13 +152,15 @@ def collect_extra_stats(stats_csv_path, distrib_path, client_id, client_data,
     if not locust_runner:
         return
 
-    user_count = locust_runner.user_count
-    total = locust_runner.stats.total
-    errors = locust_runner.stats.serialize_errors()
-    num_requests = total.num_requests
+    stats_total = locust_runner.stats.total
+    num_requests = stats_total.num_requests
     if num_requests == last_num_requests:
         # Not using > in case stats were reset.
         return
+
+    user_count = locust_runner.user_count
+    errors_data = locust_runner.stats.serialize_errors()
+    errors = _classify_errors(errors_data.values())
 
     stats_output = None
     distrib_output = None
@@ -134,29 +180,27 @@ def collect_extra_stats(stats_csv_path, distrib_path, client_id, client_data,
             if not hasattr(stats_output, 'keys'):
                 write_csv_header_locked(stats_output)
 
-    client_entries = None
+    client_stats = None
     if stats_output and client_id and client_data:
-        client_entries = {}
-        for stats_data in client_data["stats"]:
-            entry = StatsEntry.unserialize(stats_data)
-            request_key = (entry.name, entry.method)
-            client_entries[request_key] = entry
+        client_stats = ClientStats.from_client_data(client_data)
 
     request_stats = sort_stats(locust_runner.request_stats)
-    for s in chain(request_stats, [total]):
-        if stats_output:
-            if client_entries:
-                request_key = (s.name, s.method)
-                entry = client_entries.get(request_key)
-                if entry:
-                    write_csv_row(timestamp, client_id, entry, None,
-                                  stats_output)
+    for s in chain(request_stats, [stats_total]):
+        key = None if s is stats_total else (s.name, s.method)
+        e = errors.get(key)
 
-            write_csv_row(timestamp, None, s, user_count, stats_output)
+        if stats_output:
+            if client_stats:
+                client_s = client_stats.stats_for(key)
+                client_e = client_stats.errors_for(key)
+                if client_s:
+                    write_csv_row(timestamp, client_id, client_s, client_e,
+                                  None, stats_output)
+
+            write_csv_row(timestamp, None, s, e, user_count, stats_output)
 
         if distrib_output:
-            write_jsonl_entry(timestamp, s, user_count,
-                              errors if s is total else None, distrib_output)
+            write_jsonl_entry(timestamp, s, e, user_count, distrib_output)
 
     return num_requests
 
