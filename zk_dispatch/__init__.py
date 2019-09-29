@@ -19,7 +19,7 @@ _logger = logging.getLogger(__name__)
 
 _zk_admin_scheme = os.getenv('ZK_ADMIN_SCHEME', 'http')
 _zk_admin_port = int(os.getenv('ZK_ADMIN_PORT', '8080'))
-_zk_admin_ruok_timeout_ms = int(os.getenv('ZK_ADMIN_RUOK_TIMEOUT_MS', '100'))
+_zk_admin_ping_timeout_ms = int(os.getenv('ZK_ADMIN_PING_TIMEOUT_MS', '100'))
 
 
 def fetch_config():
@@ -45,7 +45,10 @@ def _compose_metrics_url(zk_host_port, command):
     return url
 
 
-MEMBER_STATE_UNKNOWN, MEMBER_STATE_UP = ['unknown', 'up']
+_MEMBER_STATE_UNKNOWN, _MEMBER_STATE_FOLLOWER, _MEMBER_STATE_LEADER = [
+    'unknown', 'follower', 'leader'
+]
+_MEMBER_STATES_UP = [_MEMBER_STATE_FOLLOWER, _MEMBER_STATE_LEADER]
 
 
 class EnsembleMember(object):
@@ -53,9 +56,9 @@ class EnsembleMember(object):
         self.host_and_port = host_and_port
         self.host, self.port = split_zk_host_port(host_and_port)
         self.http_session = requests.Session()
-        self.ping_url = _compose_metrics_url(host_and_port, 'ruok')
+        self.ping_url = _compose_metrics_url(host_and_port, 'monitor')
         self.last_ping = None
-        self.state = MEMBER_STATE_UNKNOWN
+        self.state = _MEMBER_STATE_UNKNOWN
 
         self.http_session.get_adapter(self.ping_url).max_retries = 1
 
@@ -67,26 +70,31 @@ class EnsembleMember(object):
         return s
 
     def is_up(self):
-        return self.state == MEMBER_STATE_UP
+        return self.state in _MEMBER_STATES_UP
 
     def ping(self):
-        state = MEMBER_STATE_UNKNOWN
+        state = _MEMBER_STATE_UNKNOWN
         try:
             r = self.http_session.get(
                 self.ping_url,
                 allow_redirects=False,
                 stream=False,
-                timeout=_zk_admin_ruok_timeout_ms / 1000)
+                timeout=_zk_admin_ping_timeout_ms / 1000)
             r.raise_for_status()
             v = json.loads(r.content)
-            if v['command'] == 'ruok' and v['error'] is None:
-                state = MEMBER_STATE_UP
+            if v['error'] is None:
+                server_state = v['server_state']
+                if server_state == _MEMBER_STATE_FOLLOWER:
+                    state = _MEMBER_STATE_FOLLOWER
+                elif server_state == _MEMBER_STATE_LEADER:
+                    state = _MEMBER_STATE_LEADER
         except requests.ConnectionError:
             pass
         except Exception:
             _logger.exception('Member status')
-        self.state = state
-        self.last_ping = time.time()
+        finally:
+            self.state = state
+            self.last_ping = time.time()
         return self.state
 
 
@@ -167,7 +175,8 @@ class RandomDispatcher(AbstractDispatcher):
         downs = []
         mark = time.time()
         for member in members:
-            if member.ping() == MEMBER_STATE_UP:
+            member.ping()
+            if member.is_up():
                 ups.append(member)
             else:
                 downs.append(member)
