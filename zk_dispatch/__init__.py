@@ -12,6 +12,7 @@ import requests
 import gevent
 
 import locust.runners
+from locust import events
 
 from zk_locust import split_zk_hosts, split_zk_host_port
 
@@ -36,6 +37,16 @@ _config_sleep_after_disable_ms = _configs.get('sleep_after_disable_ms', 2000)
 _config_sleep_after_enable_ms = _configs.get('sleep_after_enable_ms', 5000)
 
 _config_program = os.getenv('ZK_DISPATCH_PROGRAM')
+
+_initial_hatch_complete = False
+
+
+def on_hatch_complete(user_count):
+    global _initial_hatch_complete
+    _initial_hatch_complete = True
+
+
+events.hatch_complete += on_hatch_complete
 
 
 def _compose_metrics_url(zk_host_port, command):
@@ -71,6 +82,9 @@ class EnsembleMember(object):
 
     def is_up(self):
         return self.state in _MEMBER_STATES_UP
+
+    def is_leader(self):
+        return self.state == _MEMBER_STATE_LEADER
 
     def ping(self):
         state = _MEMBER_STATE_UNKNOWN
@@ -165,11 +179,6 @@ class AbstractDispatcher(metaclass=ABCMeta):
             cause = None
         self.sleep_ms(ms, cause)
 
-
-class RandomDispatcher(AbstractDispatcher):
-    def __init__(self, **kwargs):
-        super(RandomDispatcher, self).__init__(**kwargs)
-
     def _ping_ensemble(self, members):
         ups = []
         downs = []
@@ -183,6 +192,11 @@ class RandomDispatcher(AbstractDispatcher):
         _logger.info('Checked status of %d members (%d up) in %3gs' %
                      (len(members), len(ups), time.time() - mark))
         return [ups, downs]
+
+
+class RandomDispatcher(AbstractDispatcher):
+    def __init__(self, **kwargs):
+        super(RandomDispatcher, self).__init__(**kwargs)
 
     def _decide(self, members, ups, downs, *, quorum_size):
         n_up = len(ups)
@@ -239,6 +253,10 @@ class ProgrammedDispatcher(AbstractDispatcher):
             if self.pc >= len(self.program):
                 self.pc = 0
 
+    def _op_poll_initial_hatch_complete(self, sleep_ms):
+        while not _initial_hatch_complete:
+            self.sleep_ms(int(sleep_ms))
+
     def _op_sleep(self, sleep_ms):
         self.sleep_ms(int(sleep_ms))
 
@@ -253,6 +271,18 @@ class ProgrammedDispatcher(AbstractDispatcher):
         while not member.is_up():
             self.sleep_ms(int(sleep_ms))
             member.ping()
+
+    def _op_disable_leader(self):
+        ups, _ = self._ping_ensemble(self.members)
+        for member in ups:
+            if member.is_leader():
+                self.disable(member)
+                break
+
+    def _op_enable_all(self):
+        _, downs = self._ping_ensemble(self.members)
+        for member in downs:
+            self.enable(member)
 
     def _parse(self, program_text):
         program = []
