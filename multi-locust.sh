@@ -39,8 +39,9 @@ if [ "$COUNT" -gt '0' ]; then
     master_args+=('--master' "--expect-slaves=$COUNT")
 
     for i in $(seq "$COUNT"); do
-        nohup locust "${slave_args[@]}" "${common_args[@]}" \
-              >"$WORKDIR/locust-slave-$i.log" &
+        nohup locust "${slave_args[@]}" "${common_args[@]}"     \
+              >"$WORKDIR/locust-$i.out"                         \
+              2>"$WORKDIR/locust-$i.err" &
         if [ "$?" = '0' ]; then
             pids+=("$!")
         fi
