@@ -172,8 +172,10 @@ def plot_user_count(df, user_count_base_path):
 
 
 def plot_num_requests_per_1s(dfs, num_requests_base_path):
-    fig, axes = plt.subplots(nrows=2)
-    ax = axes[0]
+    fig, axes = plt.subplots(nrows=3)
+    req_ax = axes[0]
+    succ_ax = axes[1]
+    fail_ax = axes[2]
 
     is_relative = len(dfs) > 1
 
@@ -190,26 +192,21 @@ def plot_num_requests_per_1s(dfs, num_requests_base_path):
         dnr_dt = df.num_requests.diff()
         dnr_dt[dnr_dt < 0] = np.nan
 
-        ax.plot(df.index, dnr_dt, label='Req./s', color=color)
-
-    ax.legend()
-    ax.xaxis.label.set_visible(False)
-    ax.tick_params(axis='x', which='both', labelbottom=False)
-
-    ax = axes[1]
-
-    for i in range(len(dfs)):
-        df = dfs[i]
-        color = _colors[i % len(_colors)]
-
         dnf_dt = df.num_failures.diff()
         dnf_dt[dnf_dt < 0] = np.nan
 
-        ax.plot(df.index, dnf_dt, label='Fail/s', color=color)
+        req_ax.plot(df.index, dnr_dt, label='Req./s', color=color)
+        succ_ax.plot(df.index, dnr_dt - dnf_dt, label='Successes', color=color)
+        fail_ax.plot(df.index, dnf_dt, label='Failures', color=color)
 
-    ax.legend()
+    for ax in [req_ax, succ_ax]:
+        ax.legend()
+        ax.xaxis.label.set_visible(False)
+        ax.tick_params(axis='x', which='both', labelbottom=False)
 
-    for label in ax.get_xticklabels():
+    fail_ax.legend()
+
+    for label in fail_ax.get_xticklabels():
         label.set_ha("right")
         label.set_rotation(30)
     fig.subplots_adjust(bottom=0.2)
