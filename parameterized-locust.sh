@@ -90,7 +90,7 @@ while [ -z "$dashdash" -a "$#" -gt '0' ]; do
             multi_count="$2"
             shift 2
             ;;
-        --workdir)
+        --workdir|--multi-workdir)
             multi_workdir="$2"
             shift 2
             ;;
@@ -145,7 +145,9 @@ if [ -z "$multi_count" ]; then
     set +e
     locust "$@" "${extra_locust_args[@]}"
 else
-    if [ -z "$multi_workdir" ]; then
+    if [ -n "$multi_workdir" ]; then
+        mkdir -p "$multi_workdir"
+    else
         multi_workdir="$(mktemp -d)"
         trap "rm -rf '$multi_workdir'" EXIT
     fi
