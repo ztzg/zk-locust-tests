@@ -121,10 +121,11 @@ def _classify_errors(errors_data):
 
 
 class ClientStats(object):
-    def __init__(self, total, stats, errors):
+    def __init__(self, total, stats, errors, user_count):
         self.total = total
         self.stats = stats
         self.errors = errors
+        self.user_count = user_count
 
     def stats_for(self, key):
         return self.stats.get(key)
@@ -141,7 +142,8 @@ class ClientStats(object):
             key = (entry.name, entry.method)
             stats[key] = entry
         errors = _classify_errors(data["errors"].values())
-        return cls(total, stats, errors)
+        user_count = data["user_count"]
+        return cls(total, stats, errors, user_count)
 
 
 def collect_extra_stats(stats_csv_path, distrib_path, client_id, client_data,
@@ -195,7 +197,7 @@ def collect_extra_stats(stats_csv_path, distrib_path, client_id, client_data,
                 client_e = client_stats.errors_for(key)
                 if client_s:
                     write_csv_row(timestamp, client_id, client_s, client_e,
-                                  None, stats_output)
+                                  client_stats.user_count, stats_output)
 
             write_csv_row(timestamp, None, s, e, user_count, stats_output)
 
