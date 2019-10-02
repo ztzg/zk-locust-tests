@@ -34,22 +34,26 @@ _zkm_plots = [
     {
         'label': 'Outstanding Requests',
         'name': 'outstanding_requests',
-        'metrics': ['outstanding_requests']
+        'metrics': ['outstanding_requests'],
+        'ignore_not_serving': True
     },
     {
         'label': 'Clients',
         'name': 'clients',
-        'metrics': ['num_alive_connections']
+        'metrics': ['num_alive_connections'],
+        'ignore_not_serving': True
     },
     {
         'label': 'Nodes',
         'name': 'nodes',
-        'metrics': ['znode_count', 'ephemerals_count']
+        'metrics': ['znode_count', 'ephemerals_count'],
+        'ignore_not_serving': True
     },
     {
         'label': 'Watches',
         'name': 'watch_count',
-        'metrics': ['watch_count']
+        'metrics': ['watch_count'],
+        'ignore_not_serving': True
     }
 ]  # yapf:disable
 
@@ -329,6 +333,12 @@ def plot_num_requests(groups, num_requests_base_path):
 
 def plot_zkm(df, plot_def, base_path):
     plot_path = base_path + '_' + plot_def['name']
+
+    if plot_def['ignore_not_serving']:
+        pick = df.error != (
+            'This ZooKeeper instance is not currently serving requests')
+        df = df[pick]
+
     host_ports = df.host_port.unique()
     n = len(host_ports)
 
