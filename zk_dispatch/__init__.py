@@ -70,6 +70,7 @@ class EnsembleMember(object):
         self.ping_url = _compose_metrics_url(host_and_port, 'monitor')
         self.last_ping = None
         self.state = _MEMBER_STATE_UNKNOWN
+        self.last_disabled = None
 
         self.http_session.get_adapter(self.ping_url).max_retries = 1
 
@@ -85,6 +86,9 @@ class EnsembleMember(object):
 
     def is_leader(self):
         return self.state == _MEMBER_STATE_LEADER
+
+    def is_follower(self):
+        return self.state == _MEMBER_STATE_FOLLOWER
 
     def ping(self):
         state = _MEMBER_STATE_UNKNOWN
@@ -110,6 +114,12 @@ class EnsembleMember(object):
             self.state = state
             self.last_ping = time.time()
         return self.state
+
+    def note_disabled(self):
+        self.last_disabled = time.time()
+
+    def last_disabled_sort_key(self):
+        return self.last_disabled or 0
 
 
 class AbstractController(metaclass=ABCMeta):
@@ -155,7 +165,8 @@ class AbstractDispatcher(metaclass=ABCMeta):
         pass
 
     def disable(self, member):
-        self.controller.disable(member)
+        if self.controller.disable(member):
+            member.note_disabled()
 
     def enable(self, member):
         self.controller.enable(member)
@@ -244,6 +255,7 @@ class ProgrammedDispatcher(AbstractDispatcher):
 
     def run(self, hosts_and_ports, quorum_size):
         self.members = [EnsembleMember(hp) for hp in hosts_and_ports]
+        self.quorum_size = quorum_size
         while True:
             instr = self.program[self.pc]
             _logger.debug("Executing instruction[%d]: %s" % (self.pc, instr))
@@ -278,6 +290,23 @@ class ProgrammedDispatcher(AbstractDispatcher):
             if member.is_leader():
                 self.disable(member)
                 break
+
+    def _op_disable_follower(self):
+        ups, _ = self._ping_ensemble(self.members)
+        if len(ups) > self.quorum_size:
+            candidates = sorted([m for m in ups if m.is_follower()],
+                                key=EnsembleMember.last_disabled_sort_key)
+            # Pick one of the candidates which haven't been disabled
+            # for the longest time.
+            pick = random.choice([
+                m for m in candidates
+                if m.last_disabled == candidates[0].last_disabled
+            ])
+            self.disable(pick)
+        else:
+            _logger.info(
+                'Not disabling any follower for quorum size %d, ' +
+                'alive members: %s', self.quorum_size, ups)
 
     def _op_enable_all(self):
         _, downs = self._ping_ensemble(self.members)
