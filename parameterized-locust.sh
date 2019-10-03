@@ -65,6 +65,14 @@ while [ -z "$dashdash" -a "$#" -gt '0' ]; do
             set_var 'ZK_LOCUST_' "${1:2}" "$2"
             shift 2
             ;;
+        --ignore-connection-down)
+            set_var 'ZK_LOCUST_' "${1:2}" '1'
+            shift 1
+            ;;
+        --no-ignore-connection-down)
+            set_var 'ZK_LOCUST_' "${1:5}" '0'
+            shift 1
+            ;;
         --kazoo-handler|--kazoo-sasl-options|--kazoo-timeout-s)
             set_var 'KAZOO_LOCUST_' "${1:8}" "$2"
             shift 2
