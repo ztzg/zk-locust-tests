@@ -14,6 +14,9 @@ from . import LocustTimer
 _default_key_size = int(os.getenv('ZK_LOCUST_KEY_SIZE') or '8')
 _default_val_size = int(os.getenv('ZK_LOCUST_VAL_SIZE') or '8')
 
+_default_ignore_connection_down = int(
+    os.getenv('ZK_LOCUST_IGNORE_CONNECTION_DOWN') or '0') > 0
+
 key_seq = 0
 
 
@@ -79,11 +82,18 @@ def _create_random_key(client, key_size, sequential_keys, key_space_size,
 
 
 class AbstractOp(object):
-    def __init__(self, client, *, maybe_interrupt=None):
+    def __init__(self,
+                 client,
+                 *,
+                 maybe_interrupt=None,
+                 ignore_connection_down=None):
         self.client = client
         self._maybe_interrupt = maybe_interrupt
         self._task_set = None
         self._tick = None
+        self._ignore_connection_down = _default_ignore_connection_down
+        if ignore_connection_down is not None:
+            self._ignore_connection_down = ignore_connection_down
 
     def task(self, task_set):
         if task_set is not self._task_set:
@@ -102,6 +112,8 @@ class AbstractOp(object):
                 self._tick = opmi or tsmi
         if self._tick:
             self._tick(task_set)
+        if self._ignore_connection_down and self.client.is_connection_down():
+            return
         self.op()
 
 
