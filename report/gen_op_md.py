@@ -172,6 +172,12 @@ def vsubplots(nrows):
     return plt.subplots(nrows=nrows, figsize=figsize)
 
 
+def worker_alpha(n):
+    if n <= 2:
+        return 1.0 / 3  # Keep some transparency
+    return 2.0 / n
+
+
 def plot_latencies(groups, latencies_base_path):
     fig = plt.figure()
     ax = fig.gca()
@@ -244,7 +250,7 @@ def plot_client_count(groups, naked_client_count_path):
         labels.append(group.prefix_label('ZK Clients'))
 
         w_ids = group.client_ids()
-        alpha = 2 * 1.0 / len(w_ids)
+        alpha = worker_alpha(len(w_ids))
 
         for j in range(len(w_ids)):
             w_id = w_ids[j]
@@ -289,7 +295,7 @@ def plot_num_requests_per_1s(groups, dfs, client_dfs, num_requests_base_path):
 
         if client_dfs and client_dfs[i]:
             all_dfs += client_dfs[i]
-            alpha = 2 * 1.0 / len(client_dfs[i])
+            alpha = worker_alpha(len(client_dfs[i]))
 
         for df_j in range(len(all_dfs)):
             df = all_dfs[df_j]
@@ -616,7 +622,7 @@ def process_errors(groups, base_path):
                     ax=ax, legend=False, color=color)
             labels.append(group.prefix_label(key))
 
-            alpha = 2 * 1.0 / len(w_ids)
+            alpha = worker_alpha(len(w_ids))
 
             for w_id in w_ids:
                 plot_df = x_df[x_df.client_id == w_id]
