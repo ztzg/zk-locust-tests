@@ -385,16 +385,13 @@ def plot_num_requests_multi(groups, num_requests_base_path):
 
         for client_id in client_ids:
             client_df = df.loc[df['client_id'] == client_id, columns]
-
+            client_df = client_df.cumsum()
             client_df = client_df.reindex(
                 client_df.index.union(nidx)).interpolate().reindex(nidx)
 
             x_df += client_df
 
-            client_df = client_df.cumsum()
             x_client_dfs.append(client_df)
-
-        x_df = x_df.cumsum()
 
         dfs.append(x_df)
         client_dfs.append(x_client_dfs)
