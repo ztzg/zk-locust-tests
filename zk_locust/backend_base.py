@@ -1,8 +1,11 @@
+from abc import ABCMeta
+
+
 class ZKLocustException(Exception):
     pass
 
 
-class AbstractZKLocustClient(object):
+class AbstractZKLocustClient(metaclass=ABCMeta):
     _pseudo_root = None
     _zk_client = None
 
