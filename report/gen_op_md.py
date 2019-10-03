@@ -600,9 +600,13 @@ def process_errors(groups, base_path):
         color = _colors[i % len(_colors)]
 
         for key in keys:
+            series = series_dict.get(key)
+            if series is None:
+                continue
+
             fig, ax, fig_j, labels = figs[key]
 
-            data = {'client_id': df.client_id, key: series_dict[key]}
+            data = {'client_id': df.client_id, key: series}
 
             x_df = pd.DataFrame(data)
             w_ids = x_df.client_id.unique()
