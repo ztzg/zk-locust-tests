@@ -250,6 +250,9 @@ def plot_client_count(groups, naked_client_count_path):
         labels.append(group.prefix_label('ZK Clients'))
 
         w_ids = group.client_ids()
+        if len(w_ids) < 2:
+            continue
+
         alpha = worker_alpha(len(w_ids))
 
         for j in range(len(w_ids)):
@@ -293,7 +296,7 @@ def plot_num_requests_per_1s(groups, dfs, client_dfs, num_requests_base_path):
 
         all_dfs = [df]
 
-        if client_dfs and client_dfs[i]:
+        if client_dfs and client_dfs[i] and len(client_dfs[i]) > 1:
             all_dfs += client_dfs[i]
             alpha = worker_alpha(len(client_dfs[i]))
 
@@ -621,6 +624,9 @@ def process_errors(groups, base_path):
                 len(w_ids), center=True).sum().plot.line(
                     ax=ax, legend=False, color=color)
             labels.append(group.prefix_label(key))
+
+            if len(w_ids) < 2:
+                continue
 
             alpha = worker_alpha(len(w_ids))
 
