@@ -600,19 +600,30 @@ def process_errors(groups, base_path):
         color = _colors[i % len(_colors)]
 
         for key in keys:
+            fig, ax, fig_j, labels = figs[key]
+
             data = {'client_id': df.client_id, key: series_dict[key]}
 
             x_df = pd.DataFrame(data)
             w_ids = x_df.client_id.unique()
 
-            fig, ax, fig_j, labels = figs[key]
+            x_df[key].rolling(
+                len(w_ids), center=True).sum().plot.line(
+                    ax=ax, legend=False, color=color)
+            labels.append(group.prefix_label(key))
+
             alpha = 2 * 1.0 / len(w_ids)
 
             for w_id in w_ids:
                 plot_df = x_df[x_df.client_id == w_id]
 
                 plot_df.plot.line(
-                    y=key, ax=ax, legend=False, color=color, alpha=alpha)
+                    y=key,
+                    ax=ax,
+                    legend=False,
+                    color=color,
+                    linestyle=':',
+                    alpha=alpha)
 
                 labels.append(
                     group.prefix_label(key + _per_worker) if w_id ==
