@@ -376,6 +376,11 @@ def plot_num_requests_multi(groups, num_requests_base_path):
 
         min_t = df.index.min()
         max_t = df.index.max()
+
+        # Using a fine grid to lower aliasing.  TODO(ddiederen): It
+        # would be better to use something more robust, here; perhaps
+        # fit a spline and sample that?
+        fine_idx = pd.date_range(min_t, max_t, freq='25ms')
         nidx = pd.date_range(min_t, max_t, freq='1s')
 
         x_df = pd.DataFrame(index=nidx, columns=columns)
@@ -387,7 +392,7 @@ def plot_num_requests_multi(groups, num_requests_base_path):
             client_df = df.loc[df['client_id'] == client_id, columns]
             client_df = client_df.cumsum()
             client_df = client_df.reindex(
-                client_df.index.union(nidx)).interpolate().reindex(nidx)
+                client_df.index.union(fine_idx)).interpolate().reindex(nidx)
 
             x_df += client_df
 
