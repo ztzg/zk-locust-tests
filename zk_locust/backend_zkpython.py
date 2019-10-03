@@ -102,6 +102,9 @@ class ZKLocustClient(AbstractZKLocustClient):
     def stop(self):
         self.get_zk_client().close()
 
+    def is_connection_down(self):
+        return True
+
     def create_default_node(self):
         path = self.join_path('/d-')
         flags = zookeeper.EPHEMERAL | zookeeper.SEQUENCE

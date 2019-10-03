@@ -5,6 +5,7 @@ import kazoo.handlers.gevent
 import kazoo.handlers.threading
 import kazoo.client
 import kazoo.exceptions
+from kazoo.protocol.states import KeeperState
 
 from .backend_base import ZKLocustException, AbstractZKLocustClient
 
@@ -110,6 +111,9 @@ class KazooLocustClient(AbstractZKLocustClient):
         if self._started:
             return super(KazooLocustClient, self).get_zk_client()
         raise KazooLocustStoppedException()
+
+    def is_connection_down(self):
+        return self.get_zk_client().client_state is KeeperState.CONNECTING
 
     def create_default_node(self):
         path = self.join_path('/d-')

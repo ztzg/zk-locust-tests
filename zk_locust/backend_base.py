@@ -1,4 +1,4 @@
-from abc import ABCMeta
+from abc import ABCMeta, abstractmethod
 
 
 class ZKLocustException(Exception):
@@ -17,6 +17,10 @@ class AbstractZKLocustClient(metaclass=ABCMeta):
 
     def get_zk_client(self):
         return self._zk_client
+
+    @abstractmethod
+    def is_connection_down(self):
+        pass
 
     def has_sasl_auth(self):
         return False
