@@ -84,8 +84,9 @@ class Group(object):
 
     def prefix_label(self, label):
         if self.is_unique:
-            return label
-
+            return label or '_'
+        if not label or label.startswith('_'):
+            return self.sample_id
         return self.sample_id + ', ' + label
 
     def client_ids(self):
@@ -342,7 +343,8 @@ class ClientCountPlotter(AbstractPlotter):
                 df = relativize(df)
 
             df.plot.line(ax=ax, color=color)
-            labels.append(group.prefix_label('ZK Clients'))
+            labels.append(
+                group.prefix_label('ZK C.' if self._per_worker else '_'))
 
             if not self._per_worker:
                 continue
@@ -644,12 +646,14 @@ class ZooKeeperMetricsPlotter(AbstractPlotter):
                 for metric in metrics:
                     df.plot(y=metric, ax=ax, color=color, **kwargs)
 
-                    label = host_port
+                    label = '_'
                     if len(metrics) > 1:
-                        label += ', ' + metric
+                        label = metric
                     labels.append(group.prefix_label(label))
 
-                    kwargs['linestyle'] = ':'  # KLUDGE.
+                    # KLUDGE: We plot all but the first metric with
+                    # dotted lines.
+                    kwargs['linestyle'] = ':'
 
             if any(not l.startswith('_') for l in labels):
                 ax.legend(labels)
