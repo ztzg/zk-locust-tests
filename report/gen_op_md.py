@@ -708,7 +708,8 @@ def process_errors(groups, base_path):
     return fig_infos
 
 
-def process_task_set_op_single(task_set, op, group, base_path, md_path):
+def process_task_set_op_single(task_set, op, group, base_path, md_path,
+                               options):
     ls_df = group.ls_df
     zkm_df = group.zkm_df
     ls_merged_df = group.merged_client_stats()
@@ -738,7 +739,8 @@ def process_task_set_op_single(task_set, op, group, base_path, md_path):
              zkm_plot_infos)
 
 
-def process_task_set_op_multi(task_set, op, groups, base_path, md_path):
+def process_task_set_op_multi(task_set, op, groups, base_path, md_path,
+                              options):
     latencies_base_path = None
     latencies_groups = []
     for group in groups:
@@ -773,7 +775,7 @@ def load_group(base_input_path, data_item):
 
 
 def process_task_set_op(base_input_path, task_set, op, data, base_path,
-                        md_path):
+                        md_path, options):
     groups = [load_group(base_input_path, data_item) for data_item in data]
     is_unique = len(groups) == 1
 
@@ -781,12 +783,14 @@ def process_task_set_op(base_input_path, task_set, op, data, base_path,
         groups[0].is_unique = True
 
     if is_unique:
-        process_task_set_op_single(task_set, op, groups[0], base_path, md_path)
+        process_task_set_op_single(task_set, op, groups[0], base_path, md_path,
+                                   options)
     else:
-        process_task_set_op_multi(task_set, op, groups, base_path, md_path)
+        process_task_set_op_multi(task_set, op, groups, base_path, md_path,
+                                  options)
 
 
-def process_fragments(base_input_path, fragments, base_path, md_path):
+def process_fragments(base_input_path, fragments, base_path, md_path, options):
     frag_dict = {}
     for fragment in fragments:
         key = (fragment['task_set'], fragment['op'])
@@ -794,7 +798,7 @@ def process_fragments(base_input_path, fragments, base_path, md_path):
 
     for (task_set, op), data in frag_dict.items():
         process_task_set_op(base_input_path, task_set, op, data, base_path,
-                            md_path)
+                            md_path, options)
 
 
 def main(executable, metadata, base_path, md_path):
@@ -802,8 +806,9 @@ def main(executable, metadata, base_path, md_path):
         lines = f.readlines()
 
     fragments = [json.loads(line) for line in lines]
+    options = {}
 
-    process_fragments('.', fragments, base_path, md_path)
+    process_fragments('.', fragments, base_path, md_path, options)
 
 
 if __name__ == '__main__':

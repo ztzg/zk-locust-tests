@@ -20,8 +20,8 @@ if True:
 @click.command()
 @click.option(
     '--metrics-dir',
-    help='Directory containing collected metrics',
-    multiple=True)
+    multiple=True,
+    help='Directory containing collected metrics')
 @click.option("--zk-metrics-csv", help="Collected ZooKeeper metrics")
 @click.option("--stats-csv", help="Collected Locusts metrics")
 @click.option("--report-dir", help="Target directory for report")
@@ -29,13 +29,21 @@ if True:
     "--in-place",
     is_flag=True,
     help="Generate/update report in metrics directory")
+@click.option(
+    "--option",
+    type=(str, str),
+    multiple=True,
+    help="Set named report or plot option")
 @click.option("-f", "--force", is_flag=True, help="Possibly overwrite files")
 @click.option("-j", "--jobs", type=click.INT, help="Use parallel jobs")
 @click.option('-v', '--verbose', count=True)
-def cli(metrics_dir, zk_metrics_csv, stats_csv, report_dir, in_place, force,
-        jobs, verbose):
+def cli(metrics_dir, zk_metrics_csv, stats_csv, report_dir, option, in_place,
+        force, jobs, verbose):
     if len(metrics_dir) == 0:
         metrics_dir = ['.']
+
+    # "Normalize" to dict.
+    options = {t[0]: t[1] for t in option}
 
     is_multi = len(metrics_dir) > 1
 
@@ -127,7 +135,8 @@ def cli(metrics_dir, zk_metrics_csv, stats_csv, report_dir, in_place, force,
 
     top_frags_dir = os.path.join(report_dir, 'fragments')
     gen_op_md.process_fragments(report_dir, fragments, top_frags_dir,
-                                os.path.join(top_frags_dir, 'report.md'))
+                                os.path.join(top_frags_dir, 'report.md'),
+                                options)
 
 
 if __name__ == "__main__":
