@@ -122,7 +122,7 @@ class SavedFigInfo(object):
 
 
 def write_md(df, task_set, op, md_path, latencies_base_path,
-             user_count_base_path, num_requests_base_path, errors_fig_infos,
+             client_count_fig_infos, num_requests_base_path, errors_fig_infos,
              zkm_plot_infos):
     with open(md_path, 'w') as f:
         f.write("## Task set '%s', op '%s'\n\n" % (task_set, op))
@@ -161,9 +161,10 @@ def write_md(df, task_set, op, md_path, latencies_base_path,
             f.write('\n#### ZK Client Requests\n\n')
             f.write('\n![](%s)\n' % num_requests_base_path)
 
-        if user_count_base_path:
+        if client_count_fig_infos:
             f.write('\n#### ZK Client Count\n\n')
-            f.write('\n![](%s)\n' % user_count_base_path)
+            for saved_fig_info in client_count_fig_infos:
+                f.write('\n![](%s)\n' % saved_fig_info.naked_path)
 
         if len(zkm_plot_infos) > 0:
             f.write('\n### ZooKeeper Metrics\n\n')
@@ -307,67 +308,78 @@ def plot_latencies(groups, latencies_base_path, options):
     return plotter.plot_and_save(groups, latencies_base_path)
 
 
-def plot_client_count(groups, naked_client_count_path, options):
-    is_relative = len(groups) > 1
+class ClientCountPlotter(AbstractPlotter):
+    def __init__(self, options={}):
+        get_option = option_getter(options, 'client_count')
 
-    fig = plt.figure()
+        self._per_worker = get_option('per_worker', type=bool, fallback=True)
 
-    fig.suptitle('ZK Client Count')
+    def plot(self, groups):
+        is_relative = len(groups) > 1
 
-    ax = fig.gca()
+        fig = plt.figure()
+        title = 'ZK Client Count'
 
-    col_names = ['user_count']
-    do_per_worker = True  #parse_bool(options.get('per_worker', 'True'))
+        fig.suptitle(title)
 
-    labels = []
+        ax = fig.gca()
 
-    for i in range(len(groups)):
-        group = groups[i]
-        color = _colors[i % len(_colors)]
+        col_names = ['user_count']
 
-        df = group.merged_client_stats()
-        df = df.loc[:, col_names]
-        df = df.dropna()
+        labels = []
 
-        if is_relative:
-            index_base = df.index.min()
-            df = relativize(df)
+        for i in range(len(groups)):
+            group = groups[i]
+            color = _colors[i % len(_colors)]
 
-        df.plot.line(ax=ax, color=color)
-        labels.append(group.prefix_label('ZK Clients'))
-
-        if not do_per_worker:
-            continue
-
-        w_ids = group.client_ids()
-        if len(w_ids) < 2:
-            continue
-
-        alpha = worker_alpha(len(w_ids))
-
-        for j in range(len(w_ids)):
-            w_id = w_ids[j]
-            ws_df = group.ls_df
-            pick_rows = ws_df['client_id'] == w_id
-            w_df = ws_df.loc[pick_rows, col_names]
+            df = group.merged_client_stats()
+            df = df.loc[:, col_names]
+            df = df.dropna()
 
             if is_relative:
-                w_df = relativize(w_df, index_base=index_base)
+                index_base = df.index.min()
+                df = relativize(df)
 
-            w_df.plot.line(ax=ax, color=color, linestyle=':', alpha=alpha)
-            labels.append(
-                group.prefix_label('ZK C.' + _per_worker) if j == 0 else '_')
+            df.plot.line(ax=ax, color=color)
+            labels.append(group.prefix_label('ZK Clients'))
 
-    ax.legend(labels)
+            if not self._per_worker:
+                continue
 
-    set_ax_labels(ax, x_is_relative=is_relative, y_label='Count')
+            w_ids = group.client_ids()
+            if len(w_ids) < 2:
+                continue
 
-    for ext in _savefig_exts:
-        fig.savefig(naked_client_count_path + ext)
+            alpha = worker_alpha(len(w_ids))
 
-    plt.close(fig)
+            for j in range(len(w_ids)):
+                w_id = w_ids[j]
+                ws_df = group.ls_df
+                pick_rows = ws_df['client_id'] == w_id
+                w_df = ws_df.loc[pick_rows, col_names]
 
-    return naked_client_count_path
+                if is_relative:
+                    w_df = relativize(w_df, index_base=index_base)
+
+                w_df.plot.line(ax=ax, color=color, linestyle=':', alpha=alpha)
+                labels.append(
+                    group.prefix_label('ZK C.' +
+                                       _per_worker) if j == 0 else '_')
+
+        if any(not l.startswith('_') for l in labels):
+            ax.legend(labels)
+        else:
+            ax.get_legend().set_visible(False)
+
+        set_ax_labels(ax, x_is_relative=is_relative, y_label='Count')
+
+        return [FigInfo(fig, title)]
+
+
+def plot_client_count(groups, naked_client_count_path, options):
+    plotter = ClientCountPlotter(options)
+
+    return plotter.plot_and_save(groups, naked_client_count_path)
 
 
 def plot_num_requests_per_1s(groups, dfs, client_dfs, num_requests_base_path):
@@ -796,7 +808,7 @@ def process_task_set_op_single(task_set, op, group, base_path, md_path,
         latencies_base_path = base_path + '_latencies'
         plot_latencies([group], latencies_base_path, options)
 
-    naked_client_count_path = plot_client_count(
+    client_count_fig_infos = plot_client_count(
         [group], base_path + '_client_count', options)
 
     num_requests_base_path = base_path + '_num_requests'
@@ -812,7 +824,7 @@ def process_task_set_op_single(task_set, op, group, base_path, md_path,
             zkm_plot_infos.append(zkm_plot_info)
 
     write_md(ls_df, task_set, op, md_path, latencies_base_path,
-             naked_client_count_path, num_requests_base_path, errors_fig_infos,
+             client_count_fig_infos, num_requests_base_path, errors_fig_infos,
              zkm_plot_infos)
 
 
@@ -828,7 +840,7 @@ def process_task_set_op_multi(task_set, op, groups, base_path, md_path,
     if latencies_base_path:
         plot_latencies(latencies_groups, latencies_base_path, options)
 
-    naked_client_count_path = plot_client_count(
+    client_count_fig_infos = plot_client_count(
         groups, base_path + '_client_count', options)
 
     num_requests_base_path = base_path + '_num_requests'
