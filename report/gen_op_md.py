@@ -148,7 +148,7 @@ def write_md(df, task_set, op, md_path, latencies_base_path,
             f.write('\n![](%s)\n' % num_requests_base_path)
 
         if user_count_base_path:
-            f.write('\n#### Client Count\n\n')
+            f.write('\n#### ZK Client Count\n\n')
             f.write('\n![](%s)\n' % user_count_base_path)
 
         if len(zkm_plot_infos) > 0:
@@ -227,6 +227,9 @@ def plot_client_count(groups, naked_client_count_path):
     is_relative = len(groups) > 1
 
     fig = plt.figure()
+
+    fig.suptitle('ZK Client Count')
+
     ax = fig.gca()
 
     col_names = ['user_count']
