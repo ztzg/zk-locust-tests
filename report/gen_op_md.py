@@ -396,7 +396,8 @@ class RequestFrequencyPlotter(AbstractPlotter):
         self._per_worker = get_option('per_worker', type=bool, fallback=True)
 
     def _plot_num_requests_per_1s(self, groups, dfs, dfs_per_worker):
-        fig, axes = vsubplots(3)
+        n_axes = 3
+        fig, axes = vsubplots(n_axes)
         title = 'ZK Client Requests'
 
         fig.suptitle(title)
@@ -407,8 +408,12 @@ class RequestFrequencyPlotter(AbstractPlotter):
 
         is_relative = len(dfs) > 1
 
-        t_labels = ('Req./s', 'Successes', 'Failures')
-        w_labels = [l + _per_worker for l in t_labels]
+        x_labels = ('Req./s', 'Successes', 'Failures')
+        t_labels = ['Total' for ax in axes]
+        b_labels = ['_' for ax in axes]
+        w_labels = [_per_worker.strip() for ax in axes]
+
+        has_labels = [False for ax in axes]
 
         for i in range(len(dfs)):
             group = groups[i]
@@ -416,11 +421,13 @@ class RequestFrequencyPlotter(AbstractPlotter):
             color = _colors[i % len(_colors)]
 
             all_dfs = [df]
+            has_per_worker = False
 
             if self._per_worker and dfs_per_worker and dfs_per_worker[
                     i] and len(dfs_per_worker[i]) > 1:
                 all_dfs += dfs_per_worker[i]
                 alpha = worker_alpha(len(dfs_per_worker[i]))
+                has_per_worker = True
 
             for df_j in range(len(all_dfs)):
                 df = all_dfs[df_j]
@@ -435,7 +442,7 @@ class RequestFrequencyPlotter(AbstractPlotter):
                 dnf_dt[dnf_dt < 0] = np.nan
 
                 if df_j == 0:
-                    labels = t_labels
+                    labels = t_labels if has_per_worker else b_labels
                 elif df_j == 1:
                     labels = w_labels
                 else:
@@ -446,36 +453,34 @@ class RequestFrequencyPlotter(AbstractPlotter):
                     kwargs['alpha'] = alpha
                     kwargs['linestyle'] = ':'
 
-                req_ax.plot(
-                    df.index,
-                    dnr_dt,
-                    label=group.prefix_label(labels[0]) if labels else '_',
-                    **kwargs)
-                succ_ax.plot(
-                    df.index,
-                    dnr_dt - dnf_dt,
-                    label=group.prefix_label(labels[1]) if labels else '_',
-                    **kwargs)
-                fail_ax.plot(
-                    df.index,
-                    dnf_dt,
-                    label=group.prefix_label(labels[2]) if labels else '_',
-                    **kwargs)
+                y_values = [dnr_dt, dnr_dt - dnf_dt, dnf_dt]
 
-        for ax in [req_ax, succ_ax]:
-            ax.legend()
-            ax.set_ylabel('Count')
-            ax.xaxis.label.set_visible(False)
-            ax.tick_params(axis='x', which='both', labelbottom=False)
+                for ax_k in range(n_axes):
+                    ax = axes[ax_k]
+                    label = group.prefix_label(labels[ax_k]) if labels else '_'
 
-        fail_ax.legend()
+                    if not label.startswith('_'):
+                        has_labels[ax_k] = True
 
-        for label in fail_ax.get_xticklabels():
-            label.set_ha("right")
-            label.set_rotation(30)
+                    ax.plot(df.index, y_values[ax_k], label=label, **kwargs)
+
+        for ax_k in range(n_axes):
+            ax = axes[ax_k]
+            if has_labels[ax_k]:
+                ax.legend()
+
+            if ax is not fail_ax:
+                ax.set_ylabel('Count')
+                ax.set_xlabel(x_labels[ax_k])
+                ax.tick_params(axis='x', which='both', labelbottom=False)
+            else:
+                for label in ax.get_xticklabels():
+                    label.set_ha("right")
+                    label.set_rotation(30)
+                set_ax_labels(ax, x_is_relative=is_relative, y_label='Count')
+                ax.set_xlabel(x_labels[ax_k] + ', ' + fail_ax.get_xlabel())
+
         fig.subplots_adjust(bottom=0.2)
-
-        set_ax_labels(fail_ax, x_is_relative=is_relative, y_label='Count')
 
         return [FigInfo(fig, title)]
 
