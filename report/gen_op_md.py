@@ -122,8 +122,8 @@ class SavedFigInfo(object):
 
 
 def write_md(df, task_set, op, md_path, latencies_base_path,
-             client_count_fig_infos, num_requests_base_path, errors_fig_infos,
-             zkm_plot_infos):
+             client_count_fig_infos, request_frequency_fig_infos,
+             errors_fig_infos, zkm_plot_infos):
     with open(md_path, 'w') as f:
         f.write("## Task set '%s', op '%s'\n\n" % (task_set, op))
 
@@ -157,9 +157,10 @@ def write_md(df, task_set, op, md_path, latencies_base_path,
                 f.write('##### %s\n\n' % fig.title)
                 f.write('\n![](%s)\n\n' % fig.naked_path)
 
-        if num_requests_base_path:
+        if request_frequency_fig_infos:
             f.write('\n#### ZK Client Requests\n\n')
-            f.write('\n![](%s)\n' % num_requests_base_path)
+            for saved_fig_info in request_frequency_fig_infos:
+                f.write('\n![](%s)\n' % saved_fig_info.naked_path)
 
         if client_count_fig_infos:
             f.write('\n#### ZK Client Count\n\n')
@@ -382,196 +383,204 @@ def plot_client_count(groups, naked_client_count_path, options):
     return plotter.plot_and_save(groups, naked_client_count_path)
 
 
-def plot_num_requests_per_1s(groups, dfs, client_dfs, num_requests_base_path):
-    fig, axes = vsubplots(3)
+class RequestFrequencyPlotter(AbstractPlotter):
+    def __init__(self, options={}):
+        get_option = option_getter(options, 'request_frequency')
 
-    fig.suptitle('ZK Client Requests')
+        self._per_worker = get_option('per_worker', type=bool, fallback=True)
 
-    req_ax = axes[0]
-    succ_ax = axes[1]
-    fail_ax = axes[2]
+    def _plot_num_requests_per_1s(self, groups, dfs, dfs_per_worker):
+        fig, axes = vsubplots(3)
+        title = 'ZK Client Requests'
 
-    is_relative = len(dfs) > 1
+        fig.suptitle(title)
 
-    t_labels = ('Req./s', 'Successes', 'Failures')
-    w_labels = [l + _per_worker for l in t_labels]
+        req_ax = axes[0]
+        succ_ax = axes[1]
+        fail_ax = axes[2]
 
-    for i in range(len(dfs)):
-        group = groups[i]
-        df = dfs[i]
-        color = _colors[i % len(_colors)]
+        is_relative = len(dfs) > 1
 
-        all_dfs = [df]
+        t_labels = ('Req./s', 'Successes', 'Failures')
+        w_labels = [l + _per_worker for l in t_labels]
 
-        if client_dfs and client_dfs[i] and len(client_dfs[i]) > 1:
-            all_dfs += client_dfs[i]
-            alpha = worker_alpha(len(client_dfs[i]))
+        for i in range(len(dfs)):
+            group = groups[i]
+            df = dfs[i]
+            color = _colors[i % len(_colors)]
 
-        for df_j in range(len(all_dfs)):
-            df = all_dfs[df_j]
+            all_dfs = [df]
 
-            if is_relative:
-                df = relativize(df)
+            if self._per_worker and dfs_per_worker and dfs_per_worker[
+                    i] and len(dfs_per_worker[i]) > 1:
+                all_dfs += dfs_per_worker[i]
+                alpha = worker_alpha(len(dfs_per_worker[i]))
 
-            dnr_dt = df.num_requests.diff()
-            dnr_dt[dnr_dt < 0] = np.nan
+            for df_j in range(len(all_dfs)):
+                df = all_dfs[df_j]
 
-            dnf_dt = df.num_failures.diff()
-            dnf_dt[dnf_dt < 0] = np.nan
+                if is_relative:
+                    df = relativize(df)
 
-            if df_j == 0:
-                labels = t_labels
-            elif df_j == 1:
-                labels = w_labels
-            else:
-                labels = None
+                dnr_dt = df.num_requests.diff()
+                dnr_dt[dnr_dt < 0] = np.nan
 
-            kwargs = {'color': color}
-            if df_j > 0:
-                kwargs['alpha'] = alpha
-                kwargs['linestyle'] = ':'
+                dnf_dt = df.num_failures.diff()
+                dnf_dt[dnf_dt < 0] = np.nan
 
-            req_ax.plot(
-                df.index,
-                dnr_dt,
-                label=group.prefix_label(labels[0]) if labels else '_',
-                **kwargs)
-            succ_ax.plot(
-                df.index,
-                dnr_dt - dnf_dt,
-                label=group.prefix_label(labels[1]) if labels else '_',
-                **kwargs)
-            fail_ax.plot(
-                df.index,
-                dnf_dt,
-                label=group.prefix_label(labels[2]) if labels else '_',
-                **kwargs)
+                if df_j == 0:
+                    labels = t_labels
+                elif df_j == 1:
+                    labels = w_labels
+                else:
+                    labels = None
 
-    for ax in [req_ax, succ_ax]:
-        ax.legend()
-        ax.set_ylabel('Count')
-        ax.xaxis.label.set_visible(False)
-        ax.tick_params(axis='x', which='both', labelbottom=False)
+                kwargs = {'color': color}
+                if df_j > 0:
+                    kwargs['alpha'] = alpha
+                    kwargs['linestyle'] = ':'
 
-    fail_ax.legend()
+                req_ax.plot(
+                    df.index,
+                    dnr_dt,
+                    label=group.prefix_label(labels[0]) if labels else '_',
+                    **kwargs)
+                succ_ax.plot(
+                    df.index,
+                    dnr_dt - dnf_dt,
+                    label=group.prefix_label(labels[1]) if labels else '_',
+                    **kwargs)
+                fail_ax.plot(
+                    df.index,
+                    dnf_dt,
+                    label=group.prefix_label(labels[2]) if labels else '_',
+                    **kwargs)
 
-    for label in fail_ax.get_xticklabels():
-        label.set_ha("right")
-        label.set_rotation(30)
-    fig.subplots_adjust(bottom=0.2)
+        for ax in [req_ax, succ_ax]:
+            ax.legend()
+            ax.set_ylabel('Count')
+            ax.xaxis.label.set_visible(False)
+            ax.tick_params(axis='x', which='both', labelbottom=False)
 
-    set_ax_labels(fail_ax, x_is_relative=is_relative, y_label='Count')
+        fail_ax.legend()
 
-    for ext in _savefig_exts:
-        fig.savefig(num_requests_base_path + ext)
+        for label in fail_ax.get_xticklabels():
+            label.set_ha("right")
+            label.set_rotation(30)
+        fig.subplots_adjust(bottom=0.2)
 
-    plt.close(fig)
-    return True
+        set_ax_labels(fail_ax, x_is_relative=is_relative, y_label='Count')
 
+        return [FigInfo(fig, title)]
 
-def plot_num_requests_multi(groups, num_requests_base_path):
-    columns = ['num_requests', 'num_failures']
+    def _plot_num_requests_multi(self, groups):
+        columns = ['num_requests', 'num_failures']
 
-    sel_groups = []
+        sel_groups = []
 
-    for group in groups:
-        df = group.unmerged_client_stats()
+        for group in groups:
+            df = group.unmerged_client_stats()
 
-        if len(df) < 2:
-            continue
+            if len(df) < 2:
+                continue
 
-        sel_groups.append(group)
+            sel_groups.append(group)
 
-    if len(sel_groups) == 0:
-        return False
+        if len(sel_groups) == 0:
+            return False
 
-    dfs = []
-    client_dfs = []
+        dfs = []
+        dfs_per_worker = []
 
-    for i in range(len(sel_groups)):
-        group = sel_groups[i]
-        df = group.unmerged_client_stats()
-        client_ids = group.client_ids()
+        for i in range(len(sel_groups)):
+            group = sel_groups[i]
+            df = group.unmerged_client_stats()
+            w_ids = group.client_ids()
 
-        min_t = df.index.min()
-        max_t = df.index.max()
+            min_t = df.index.min()
+            max_t = df.index.max()
 
-        # Using a fine grid to lower aliasing.  TODO(ddiederen): It
-        # would be better to use something more robust, here; perhaps
-        # fit a spline and sample that?
-        fine_idx = pd.date_range(min_t, max_t, freq='25ms')
+            # Using a fine grid to lower aliasing.  TODO(ddiederen): It
+            # would be better to use something more robust, here; perhaps
+            # fit a spline and sample that?
+            fine_idx = pd.date_range(min_t, max_t, freq='25ms')
+            nidx = pd.date_range(min_t, max_t, freq='1s')
+
+            x_df = pd.DataFrame(index=nidx, columns=columns)
+            x_df = x_df.fillna(0)
+
+            x_w_dfs = []
+
+            for client_id in w_ids:
+                w_df = df.loc[df['client_id'] == client_id, columns]
+                w_df = w_df.cumsum()
+                w_df = w_df.reindex(
+                    w_df.index.union(fine_idx)).interpolate().reindex(nidx)
+
+                x_df += w_df
+
+                if self._per_worker:
+                    x_w_dfs.append(w_df)
+
+            dfs.append(x_df)
+            if self._per_worker:
+                dfs_per_worker.append(x_w_dfs)
+
+        return self._plot_num_requests_per_1s(sel_groups, dfs, dfs_per_worker)
+
+    def plot(self, groups):
+        can_multi = True
+        for group in groups:
+            clients_df = group.unmerged_client_stats()
+            if not len(clients_df):
+                can_multi = False
+                break
+
+        if can_multi:
+            return self._plot_num_requests_multi(groups)
+
+        dfs = []
+        min_t = None
+        max_t = None
+
+        sel_groups = []
+
+        for group in groups:
+            df = group.merged_client_stats()
+            df = df.loc[:, ['num_requests', 'num_failures']]
+            df = df.dropna()
+
+            if len(df) < 2:
+                continue
+
+            dfs.append(df)
+            sel_groups.append(group)
+
+            df_min_t = df.index.min()
+            df_max_t = df.index.max()
+            if min_t is None or df_min_t < min_t:
+                min_t = df_min_t
+            if max_t is None or df_max_t > max_t:
+                max_t = df_max_t
+
+        if len(dfs) == 0:
+            return False
+
         nidx = pd.date_range(min_t, max_t, freq='1s')
 
-        x_df = pd.DataFrame(index=nidx, columns=columns)
-        x_df = x_df.fillna(0)
+        for i in range(len(dfs)):
+            df = dfs[i]
+            df = df.reindex(df.index.union(nidx)).interpolate().reindex(nidx)
+            # df = df.rolling(3).mean()
+            dfs[i] = df
 
-        x_client_dfs = []
-
-        for client_id in client_ids:
-            client_df = df.loc[df['client_id'] == client_id, columns]
-            client_df = client_df.cumsum()
-            client_df = client_df.reindex(
-                client_df.index.union(fine_idx)).interpolate().reindex(nidx)
-
-            x_df += client_df
-
-            x_client_dfs.append(client_df)
-
-        dfs.append(x_df)
-        client_dfs.append(x_client_dfs)
-
-    return plot_num_requests_per_1s(sel_groups, dfs, client_dfs,
-                                    num_requests_base_path)
+        return self._plot_num_requests_per_1s(sel_groups, dfs, None)
 
 
-def plot_num_requests(groups, num_requests_base_path):
-    can_multi = True
-    for group in groups:
-        clients_df = group.unmerged_client_stats()
-        if not len(clients_df):
-            can_multi = False
-            break
+def plot_request_frequency(groups, base_path, options):
+    plotter = RequestFrequencyPlotter(options)
 
-    if can_multi:
-        return plot_num_requests_multi(groups, num_requests_base_path)
-
-    dfs = []
-    min_t = None
-    max_t = None
-
-    sel_groups = []
-
-    for group in groups:
-        df = group.merged_client_stats()
-        df = df.loc[:, ['num_requests', 'num_failures']]
-        df = df.dropna()
-
-        if len(df) < 2:
-            continue
-
-        dfs.append(df)
-        sel_groups.append(group)
-
-        df_min_t = df.index.min()
-        df_max_t = df.index.max()
-        if min_t is None or df_min_t < min_t:
-            min_t = df_min_t
-        if max_t is None or df_max_t > max_t:
-            max_t = df_max_t
-
-    if len(dfs) == 0:
-        return False
-
-    nidx = pd.date_range(min_t, max_t, freq='1s')
-
-    for i in range(len(dfs)):
-        df = dfs[i]
-        df = df.reindex(df.index.union(nidx)).interpolate().reindex(nidx)
-        # df = df.rolling(3).mean()
-        dfs[i] = df
-
-    return plot_num_requests_per_1s(sel_groups, dfs, None,
-                                    num_requests_base_path)
+    return plotter.plot_and_save(groups, base_path)
 
 
 def plot_zkm_multi(groups, plot_def, base_path):
@@ -811,9 +820,8 @@ def process_task_set_op_single(task_set, op, group, base_path, md_path,
     client_count_fig_infos = plot_client_count(
         [group], base_path + '_client_count', options)
 
-    num_requests_base_path = base_path + '_num_requests'
-    if not plot_num_requests([group], num_requests_base_path):
-        num_requests_base_path = None
+    request_frequency_fig_infos = plot_request_frequency(
+        [group], base_path + '_num_requests', options)
 
     errors_fig_infos = process_errors([group], base_path + '_errors')
 
@@ -824,8 +832,8 @@ def process_task_set_op_single(task_set, op, group, base_path, md_path,
             zkm_plot_infos.append(zkm_plot_info)
 
     write_md(ls_df, task_set, op, md_path, latencies_base_path,
-             client_count_fig_infos, num_requests_base_path, errors_fig_infos,
-             zkm_plot_infos)
+             client_count_fig_infos, request_frequency_fig_infos,
+             errors_fig_infos, zkm_plot_infos)
 
 
 def process_task_set_op_multi(task_set, op, groups, base_path, md_path,
@@ -843,9 +851,8 @@ def process_task_set_op_multi(task_set, op, groups, base_path, md_path,
     client_count_fig_infos = plot_client_count(
         groups, base_path + '_client_count', options)
 
-    num_requests_base_path = base_path + '_num_requests'
-    if not plot_num_requests(groups, num_requests_base_path):
-        num_requests_base_path = None
+    request_frequency_fig_infos = plot_request_frequency(
+        groups, base_path + '_num_requests', options)
 
     errors_fig_infos = process_errors(groups, base_path + '_errors')
 
