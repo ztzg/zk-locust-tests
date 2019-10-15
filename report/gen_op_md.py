@@ -123,7 +123,7 @@ class SavedFigInfo(object):
 
 def write_md(df, task_set, op, md_path, latencies_base_path,
              client_count_fig_infos, request_frequency_fig_infos,
-             errors_fig_infos, zkm_plot_infos):
+             errors_fig_infos, zkm_fig_infos):
     with open(md_path, 'w') as f:
         f.write("## Task set '%s', op '%s'\n\n" % (task_set, op))
 
@@ -167,11 +167,11 @@ def write_md(df, task_set, op, md_path, latencies_base_path,
             for saved_fig_info in client_count_fig_infos:
                 f.write('\n![](%s)\n' % saved_fig_info.naked_path)
 
-        if len(zkm_plot_infos) > 0:
+        if zkm_fig_infos:
             f.write('\n### ZooKeeper Metrics\n\n')
-            for label, base_path in zkm_plot_infos:
-                f.write('\n#### %s\n\n' % label)
-                f.write('\n![](%s)\n' % base_path)
+            for saved_fig_info in zkm_fig_infos:
+                f.write('\n#### %s\n\n' % saved_fig_info.fig_info.title)
+                f.write('\n![](%s)\n' % saved_fig_info.naked_path)
 
         f.write('\n')
 
@@ -583,82 +583,95 @@ def plot_request_frequency(groups, base_path, options):
     return plotter.plot_and_save(groups, base_path)
 
 
-def plot_zkm_multi(groups, plot_def, base_path):
-    plot_path = base_path + '_' + plot_def['name']
+class ZooKeeperMetricsPlotter(AbstractPlotter):
+    def __init__(self, plot_def, options={}):
+        self._def = plot_def
 
-    host_ports = set()
-    dfs = []
-    sel_groups = []
-    for group in groups:
-        df = group.zkm_df
-        pick = df.error != (
-            'This ZooKeeper instance is not currently serving requests')
-        df = df[pick]
+    def plot(self, groups):
+        plot_def = self._def
 
-        if not len(df):
-            continue
+        title = 'ZooKeeper ' + plot_def['label']
 
-        host_ports |= set(df.host_port.unique())
-
-        dfs.append(df)
-        sel_groups.append(group)
-
-    if len(dfs) > 1:
-        for group_j in range(len(dfs)):
-            dfs[group_j] = relativize(dfs[group_j])
-
-    host_ports = list(host_ports)
-    n = len(host_ports)
-
-    fig, axes = vsubplots(n)
-
-    fig.suptitle('ZooKeeper ' + plot_def['label'])
-
-    metrics = plot_def['metrics']
-    ylabel = plot_def['ylabel']
-
-    for host_i in range(n):
-        ax = axes[host_i]
-        host_port = host_ports[host_i]
-        labels = []
-
-        for group_j in range(len(dfs)):
-            group = sel_groups[group_j]
-            color = _colors[group_j % len(_colors)]
-
-            df = dfs[group_j]
-            df = df[df.host_port == host_port]
+        host_ports = set()
+        dfs = []
+        sel_groups = []
+        for group in groups:
+            df = group.zkm_df
+            pick = df.error != (
+                'This ZooKeeper instance is not currently serving requests')
+            df = df[pick]
 
             if not len(df):
                 continue
 
-            kwargs = {}
-            for metric in metrics:
-                df.plot(y=metric, ax=ax, color=color, **kwargs)
+            host_ports |= set(df.host_port.unique())
 
-                label = host_port
-                if len(metrics) > 1:
-                    label += ', ' + metric
-                labels.append(group.prefix_label(label))
+            dfs.append(df)
+            sel_groups.append(group)
 
-                kwargs['linestyle'] = ':'  # KLUDGE.
+        is_relative = len(dfs) > 1
 
-        if labels:
-            ax.legend(labels)
+        if is_relative:
+            for group_j in range(len(dfs)):
+                dfs[group_j] = relativize(dfs[group_j])
 
-        if (host_i < n - 1):
-            ax.xaxis.label.set_visible(False)
-            ax.set_ylabel(ylabel)
-            ax.tick_params(axis='x', which='both', labelbottom=False)
-        else:
-            set_ax_labels(ax, y_label=ylabel)
+        host_ports = list(host_ports)
+        n = len(host_ports)
 
-    for ext in _savefig_exts:
-        fig.savefig(plot_path + ext)
+        fig, axes = vsubplots(n)
 
-    plt.close(fig)
+        fig.suptitle(title)
 
-    return (plot_def['label'], plot_path)
+        metrics = plot_def['metrics']
+        ylabel = plot_def['ylabel']
+
+        for host_i in range(n):
+            ax = axes[host_i]
+            host_port = host_ports[host_i]
+            labels = []
+
+            for group_j in range(len(dfs)):
+                group = sel_groups[group_j]
+                color = _colors[group_j % len(_colors)]
+
+                df = dfs[group_j]
+                df = df[df.host_port == host_port]
+
+                if not len(df):
+                    continue
+
+                kwargs = {}
+                for metric in metrics:
+                    df.plot(y=metric, ax=ax, color=color, **kwargs)
+
+                    label = host_port
+                    if len(metrics) > 1:
+                        label += ', ' + metric
+                    labels.append(group.prefix_label(label))
+
+                    kwargs['linestyle'] = ':'  # KLUDGE.
+
+            if any(not l.startswith('_') for l in labels):
+                ax.legend(labels)
+            else:
+                ax.get_legend().set_visible(False)
+
+            if (host_i < n - 1):
+                ax.tick_params(axis='x', which='both', labelbottom=False)
+                ax.set_xlabel(host_port)
+                ax.set_ylabel(ylabel)
+            else:
+                set_ax_labels(ax, x_is_relative=is_relative, y_label=ylabel)
+                ax.set_xlabel(host_port + ', ' + ax.get_xlabel())
+
+        return [FigInfo(fig, title)]
+
+
+def plot_zkm_multi(groups, plot_def, base_path, options):
+    plotter = ZooKeeperMetricsPlotter(plot_def, options)
+    plot_path = base_path + '_' + plot_def['name']
+
+    return plotter.plot_and_save(groups, plot_path)
 
 
 def process_errors_single(df):
@@ -825,15 +838,15 @@ def process_task_set_op_single(task_set, op, group, base_path, md_path,
 
     errors_fig_infos = process_errors([group], base_path + '_errors')
 
-    zkm_plot_infos = []
+    zkm_fig_infos = []
     if len(zkm_df) > 0:
         for plot_def in _zkm_plots:
-            zkm_plot_info = plot_zkm_multi([group], plot_def, base_path)
-            zkm_plot_infos.append(zkm_plot_info)
+            fis = plot_zkm_multi([group], plot_def, base_path, options)
+            zkm_fig_infos += fis
 
     write_md(ls_df, task_set, op, md_path, latencies_base_path,
              client_count_fig_infos, request_frequency_fig_infos,
-             errors_fig_infos, zkm_plot_infos)
+             errors_fig_infos, zkm_fig_infos)
 
 
 def process_task_set_op_multi(task_set, op, groups, base_path, md_path,
@@ -857,7 +870,7 @@ def process_task_set_op_multi(task_set, op, groups, base_path, md_path,
     errors_fig_infos = process_errors(groups, base_path + '_errors')
 
     for plot_def in _zkm_plots:
-        zkm_plot_info = plot_zkm_multi(groups, plot_def, base_path)
+        plot_zkm_multi(groups, plot_def, base_path, options)
 
 
 def load_group(base_input_path, data_item):
