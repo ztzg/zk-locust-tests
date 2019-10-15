@@ -596,10 +596,12 @@ def process_errors(groups, base_path):
     fig_j = 0
     figs = {}
     for key in keys:
-        tuple = plt.subplots()
-        tuple += (fig_j, [])
+        fig, ax = plt.subplots()
+
+        fig.suptitle(f'{key} Errors')
+
+        figs[key] = (fig, ax, fig_j, [])
         fig_j += 1
-        figs[key] = tuple
 
     for i in range(len(dfs)):
         df = dfs[i]
@@ -622,10 +624,11 @@ def process_errors(groups, base_path):
             x_df[key].rolling(
                 len(w_ids), center=True).sum().plot.line(
                     ax=ax, legend=False, color=color)
-            labels.append(group.prefix_label(key))
 
             if len(w_ids) < 2:
                 continue
+
+            labels.append(group.prefix_label(key + ' (Total)'))
 
             alpha = worker_alpha(len(w_ids))
 
@@ -649,7 +652,8 @@ def process_errors(groups, base_path):
     for key in keys:
         fig, ax, fig_j, labels = figs[key]
 
-        ax.legend(labels)
+        if labels:
+            ax.legend(labels)
 
         naked_path = base_path
         if fig_j > 0:
