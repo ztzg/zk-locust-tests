@@ -32,6 +32,7 @@ unset ZK_DISPATCH_PROGRAM
 unset LOCUST_EXTRA_STATS_CSV
 unset LOCUST_EXTRA_STATS_DISTRIB
 unset LOCUST_EXTRA_STATS_COLLECT
+unset LOCUST_EXTRA_CONTROL_PROGRAM
 
 set_var() {
     local prefix="$1"; shift
@@ -81,7 +82,7 @@ while [ -z "$dashdash" -a "$#" -gt '0' ]; do
             set_var 'ZK_LOCUST_' "${1:2}" "$2"
             shift 2
             ;;
-        --stats-csv|--stats-distrib|--stats-collect)
+        --stats-csv|--stats-distrib|--stats-collect|--control-program)
             set_var 'LOCUST_EXTRA_' "${1:2}" "$2"
             shift 2
             ;;
