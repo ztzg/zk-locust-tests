@@ -22,6 +22,11 @@ if True:
     '--metrics-dir',
     multiple=True,
     help='Directory containing collected metrics')
+@click.option(
+    "--labeled-metrics-dir",
+    type=(str, str),
+    multiple=True,
+    help="Like --metrics-dir, but also defines a label")
 @click.option("--zk-metrics-csv", help="Collected ZooKeeper metrics")
 @click.option("--stats-csv", help="Collected Locusts metrics")
 @click.option("--report-dir", help="Target directory for report")
@@ -37,9 +42,18 @@ if True:
 @click.option("-f", "--force", is_flag=True, help="Possibly overwrite files")
 @click.option("-j", "--jobs", type=click.INT, help="Use parallel jobs")
 @click.option('-v', '--verbose', count=True)
-def cli(metrics_dir, zk_metrics_csv, stats_csv, report_dir, option, in_place,
-        force, jobs, verbose):
-    if len(metrics_dir) == 0:
+def cli(metrics_dir, labeled_metrics_dir, zk_metrics_csv, stats_csv,
+        report_dir, option, in_place, force, jobs, verbose):
+    if metrics_dir and labeled_metrics_dir:
+        raise click.ClickException(
+            '--metrics-dir and --labeled-metrics-dir cannot be used together.')
+
+    labels = None
+    if labeled_metrics_dir:
+        metrics_dir = [b for (a, b) in labeled_metrics_dir]
+        labels = [a for (a, b) in labeled_metrics_dir]
+
+    if not metrics_dir:
         metrics_dir = ['.']
 
     # "Normalize" to dict.
@@ -131,7 +145,13 @@ def cli(metrics_dir, zk_metrics_csv, stats_csv, report_dir, option, in_place,
         with open(frags_path) as f:
             lines = f.readlines()
 
-        fragments += [json.loads(line) for line in lines]
+        for line in lines:
+            fragment = json.loads(line)
+            if labels and labels[i]:
+                for data_item in fragment.get('data', []):
+                    if not data_item.get('label'):
+                        data_item['label'] = labels[i]
+            fragments.append(fragment)
 
     top_frags_dir = os.path.join(report_dir, 'fragments')
     gen_op_md.process_fragments(report_dir, fragments, top_frags_dir,

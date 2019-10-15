@@ -73,9 +73,10 @@ _zkm_plots = [
 
 
 class Group(object):
-    def __init__(self, sample_id, ls_df, zkm_df):
+    def __init__(self, sample_id, label, ls_df, zkm_df):
         self.is_unique = False
         self.sample_id = sample_id
+        self.label = label
         self.ls_df = ls_df
         self.zkm_df = zkm_df
         self._client_ids = None
@@ -85,9 +86,13 @@ class Group(object):
     def prefix_label(self, label):
         if self.is_unique:
             return label or '_'
+
+        prefix = self.label or self.sample_id or ''
+
         if not label or label.startswith('_'):
-            return self.sample_id
-        return self.sample_id + ', ' + label
+            return prefix or '_'
+
+        return prefix + ', ' + label
 
     def client_ids(self):
         if self._client_ids is None:
@@ -895,12 +900,13 @@ def process_task_set_op_multi(task_set, op, groups, base_path, md_path,
 
 def load_group(base_input_path, data_item):
     sample_id = data_item.get('id') or None
+    label = data_item.get('label') or None
     ls_csv_path = os.path.join(base_input_path, data_item['locust-stats'])
     ls_df = pd.read_csv(ls_csv_path, index_col=0, parse_dates=True)
     zkm_csv_path = os.path.join(base_input_path, data_item['zk-metrics'])
     zkm_df = pd.read_csv(zkm_csv_path, index_col=0, parse_dates=True)
 
-    return Group(sample_id, ls_df, zkm_df)
+    return Group(sample_id, label, ls_df, zkm_df)
 
 
 def process_task_set_op(base_input_path, task_set, op, data, base_path,
