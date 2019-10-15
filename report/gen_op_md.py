@@ -498,6 +498,10 @@ def plot_zkm_multi(groups, plot_def, base_path):
 
     fig, axes = vsubplots(n)
 
+    fig.suptitle('ZooKeeper ' + plot_def['label'])
+
+    metrics = plot_def['metrics']
+
     for host_i in range(n):
         ax = axes[host_i]
         host_port = host_ports[host_i]
@@ -514,12 +518,18 @@ def plot_zkm_multi(groups, plot_def, base_path):
                 continue
 
             kwargs = {}
-            for metric in plot_def['metrics']:
+            for metric in metrics:
                 df.plot(y=metric, ax=ax, color=color, **kwargs)
-                labels.append(group.prefix_label(host_port + ", " + metric))
+
+                label = host_port
+                if len(metrics) > 1:
+                    label += ', ' + metric
+                labels.append(group.prefix_label(label))
+
                 kwargs['linestyle'] = ':'  # KLUDGE.
 
-        ax.legend(labels)
+        if labels:
+            ax.legend(labels)
 
         if (host_i < n - 1):
             ax.xaxis.label.set_visible(False)
