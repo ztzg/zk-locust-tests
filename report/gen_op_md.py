@@ -184,6 +184,9 @@ def plot_latencies(groups, latencies_base_path):
 
     is_relative = len(groups) > 1
 
+    shaded_pcs = ['66%', '75%', '80%', '90%', '98%']
+    highlighted_pcs = [('50%', '-'), ('95%', '--'), ('99%', ':')]
+
     for i in range(len(groups)):
         is_main = i == 0
         group = groups[i]
@@ -194,7 +197,8 @@ def plot_latencies(groups, latencies_base_path):
             df = relativize(df)
 
         if is_main:
-            for pc in ['66%', '75%', '80%', '90%', '98%', '99%', '100%']:
+            # Only shade first group.
+            for pc in shaded_pcs:
                 ax.fill_between(
                     df.index,
                     0,
@@ -203,20 +207,13 @@ def plot_latencies(groups, latencies_base_path):
                     alpha=0.1,
                     label=group.prefix_label(pc))
 
-        df.plot.line(
-            y='50%', color=color, ax=ax, label=group.prefix_label('50%'))
-        df.plot.line(
-            y='95%',
-            color=color,
-            linestyle='--',
-            ax=ax,
-            label=group.prefix_label('95%'))
-        df.plot.line(
-            y='100%',
-            color=color,
-            linestyle=':',
-            ax=ax,
-            label=group.prefix_label('100%'))
+        for (pc, linestyle) in highlighted_pcs:
+            df.plot.line(
+                y=pc,
+                color=color,
+                linestyle=linestyle,
+                ax=ax,
+                label=group.prefix_label(pc))
 
     for ext in _savefig_exts:
         fig.savefig(latencies_base_path + ext)
