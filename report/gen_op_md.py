@@ -786,10 +786,13 @@ class ErrorsPlotter(AbstractPlotter):
                     len(w_ids), center=True).sum().plot.line(
                         ax=ax, legend=False, color=color)
 
-                if len(w_ids) < 2 or not self._per_worker:
-                    continue
+                is_per_worker = len(w_ids) > 1 and self._per_worker
 
-                labels.append(group.prefix_label(key + ' (Total)'))
+                if is_per_worker or is_relative:
+                    labels.append(group.prefix_label('_'))
+
+                if not is_per_worker:
+                    continue
 
                 alpha = worker_alpha(len(w_ids))
 
@@ -805,7 +808,7 @@ class ErrorsPlotter(AbstractPlotter):
                         alpha=alpha)
 
                     labels.append(
-                        group.prefix_label(key + _per_worker) if w_id ==
+                        group.prefix_label(_per_worker.strip()) if w_id ==
                         w_ids[0] else '_')
 
         fig_infos = []
