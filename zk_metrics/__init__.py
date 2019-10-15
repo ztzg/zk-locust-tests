@@ -20,8 +20,8 @@ from .defs import metric_defs
 _logger = logging.getLogger(__name__)
 
 _zk_host_ports = split_zk_hosts()
-_zk_metrics_scheme = 'http'
-_zk_metrics_port = 8080
+_zk_admin_scheme = os.getenv('ZK_ADMIN_SCHEME', 'http')
+_zk_admin_port = int(os.getenv('ZK_ADMIN_PORT', '8080'))
 
 _zk_metrics_collect = os.getenv('ZK_LOCUST_ZK_METRICS_COLLECT', 'web')
 
@@ -34,8 +34,8 @@ _page = Blueprint(
 
 def compose_metrics_url(zk_host_port, command):
     host = split_zk_host_port(zk_host_port)[0]
-    host_port = host + ':' + str(_zk_metrics_port)
-    url = _zk_metrics_scheme + '://' + host_port + '/commands/' + command
+    host_port = host + ':' + str(_zk_admin_port)
+    url = _zk_admin_scheme + '://' + host_port + '/commands/' + command
     return url
 
 
