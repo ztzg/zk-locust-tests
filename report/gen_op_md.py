@@ -243,7 +243,7 @@ def plot_latencies(groups, latencies_base_path, options):
     plt.close(fig)
 
 
-def plot_client_count(groups, naked_client_count_path):
+def plot_client_count(groups, naked_client_count_path, options):
     is_relative = len(groups) > 1
 
     fig = plt.figure()
@@ -253,6 +253,7 @@ def plot_client_count(groups, naked_client_count_path):
     ax = fig.gca()
 
     col_names = ['user_count']
+    do_per_worker = parse_bool(options.get('per_worker', 'True'))
 
     labels = []
 
@@ -270,6 +271,9 @@ def plot_client_count(groups, naked_client_count_path):
 
         df.plot.line(ax=ax, color=color)
         labels.append(group.prefix_label('ZK Clients'))
+
+        if not do_per_worker:
+            continue
 
         w_ids = group.client_ids()
         if len(w_ids) < 2:
@@ -727,8 +731,8 @@ def process_task_set_op_single(task_set, op, group, base_path, md_path,
         latencies_base_path = base_path + '_latencies'
         plot_latencies([group], latencies_base_path, options)
 
-    naked_client_count_path = plot_client_count([group],
-                                                base_path + '_client_count')
+    naked_client_count_path = plot_client_count(
+        [group], base_path + '_client_count', options)
 
     num_requests_base_path = base_path + '_num_requests'
     if not plot_num_requests([group], num_requests_base_path):
@@ -759,8 +763,8 @@ def process_task_set_op_multi(task_set, op, groups, base_path, md_path,
     if latencies_base_path:
         plot_latencies(latencies_groups, latencies_base_path, options)
 
-    naked_client_count_path = plot_client_count(groups,
-                                                base_path + '_client_count')
+    naked_client_count_path = plot_client_count(
+        groups, base_path + '_client_count', options)
 
     num_requests_base_path = base_path + '_num_requests'
     if not plot_num_requests(groups, num_requests_base_path):
