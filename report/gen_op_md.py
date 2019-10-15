@@ -6,6 +6,8 @@ import logging
 import json
 import warnings
 
+import distutils.util
+
 import numpy as np
 import pandas as pd
 import pandas.plotting
@@ -164,6 +166,11 @@ def write_md(df, task_set, op, md_path, latencies_base_path,
         f.write('\n')
 
 
+def parse_bool(s):
+    # Really?
+    return distutils.util.strtobool(s)
+
+
 def relativize(df, *, index_base=None):
     if index_base is None:
         index_base = df.index.min()
@@ -188,13 +195,14 @@ def set_ax_labels(ax, *, x_is_relative=False, y_label=None):
         ax.set_ylabel(y_label)
 
 
-def plot_latencies(groups, latencies_base_path):
+def plot_latencies(groups, latencies_base_path, options):
     fig = plt.figure()
     ax = fig.gca()
 
     fig.suptitle('Operation Latencies')
 
     is_relative = len(groups) > 1
+    do_shade = parse_bool(options.get('shade_latencies', 'True'))
 
     shaded_pcs = ['66%', '75%', '80%', '90%', '98%']
     highlighted_pcs = [('50%', '-'), ('95%', '--'), ('99%', ':')]
@@ -208,7 +216,7 @@ def plot_latencies(groups, latencies_base_path):
         if is_relative:
             df = relativize(df)
 
-        if is_main:
+        if is_main and do_shade:
             # Only shade first group.
             for pc in shaded_pcs:
                 ax.fill_between(
@@ -717,7 +725,7 @@ def process_task_set_op_single(task_set, op, group, base_path, md_path,
     latencies_base_path = None
     if len(ls_merged_df) > 0:
         latencies_base_path = base_path + '_latencies'
-        plot_latencies([group], latencies_base_path)
+        plot_latencies([group], latencies_base_path, options)
 
     naked_client_count_path = plot_client_count([group],
                                                 base_path + '_client_count')
@@ -749,7 +757,7 @@ def process_task_set_op_multi(task_set, op, groups, base_path, md_path,
             latencies_groups.append(group)
 
     if latencies_base_path:
-        plot_latencies(latencies_groups, latencies_base_path)
+        plot_latencies(latencies_groups, latencies_base_path, options)
 
     naked_client_count_path = plot_client_count(groups,
                                                 base_path + '_client_count')
