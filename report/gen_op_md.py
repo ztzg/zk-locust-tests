@@ -110,9 +110,13 @@ class Group(object):
 
 
 class FigInfo(object):
-    def __init__(self, fig, title):
+    def __init__(self, fig, title, *, weight=None):
         self.fig = fig
         self.title = title
+        self._weight = weight
+
+    def get_weight(self):
+        return self._weight
 
 
 class SavedFigInfo(object):
@@ -814,9 +818,11 @@ class ErrorsPlotter(AbstractPlotter):
 
             set_ax_labels(ax, x_is_relative=is_relative, y_label='Count')
 
-            fig_infos.append(FigInfo(fig, title))
+            a, b = ax.get_ylim()
 
-        return fig_infos
+            fig_infos.append(FigInfo(fig, title, weight=abs(a - b)))
+
+        return sorted(fig_infos, key=FigInfo.get_weight, reverse=True)
 
 
 def process_errors(groups, base_path, options):
