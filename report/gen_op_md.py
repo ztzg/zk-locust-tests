@@ -231,6 +231,21 @@ def set_ax_labels(ax, *, x_is_relative=False, y_label=None):
         ax.set_ylabel(y_label)
 
 
+def ysync_axes_widen(axes):
+    for ax in axes:
+        if ax is axes[0]:
+            bottom, top = ax.get_ylim()
+        else:
+            axes[0].get_shared_x_axes().join(axes[0], ax)
+
+            bottom_k, top_k = ax.get_ylim()
+            bottom = min(bottom, bottom_k)
+            top = max(top, top_k)
+
+    for ax in axes:
+        ax.set_ylim(bottom=bottom, top=top)
+
+
 class AbstractPlotter(metaclass=ABCMeta):
     def __init__(self, get_option=None):
         self._figsize = _figsize
@@ -509,6 +524,9 @@ class RequestFrequencyPlotter(AbstractPlotter):
 
         fig.subplots_adjust(bottom=0.2)
 
+        ysync_axes_widen([req_ax, succ_ax])
+        req_ax.get_shared_x_axes().join(req_ax, fail_ax)
+
         return [FigInfo(fig, title)]
 
     def _plot_num_requests_multi(self, groups):
@@ -707,6 +725,8 @@ class ZooKeeperMetricsPlotter(AbstractPlotter):
             else:
                 set_ax_labels(ax, x_is_relative=is_relative, y_label=ylabel)
                 ax.set_xlabel(host_port + ', ' + ax.get_xlabel())
+
+        ysync_axes_widen(axes)
 
         return [FigInfo(fig, title)]
 
