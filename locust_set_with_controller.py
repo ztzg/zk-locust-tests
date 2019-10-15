@@ -1,3 +1,44 @@
+# A small locustfile which dynamically controls the number of
+# ZooKeeper clients.
+#
+# It can be run without a control program, in which case it will use
+# the "_coded_example" function below, or with a program such as:
+#
+#     CONTROL_PROGRAM='
+#         poll_initial_hatch_complete 500
+#         set_min_num_clients 16
+#         set_max_num_clients 512
+#         sleep 5000
+#         multiply_num_clients <>1.75
+#     '
+#
+# Note that the above runs "in a loop"; consequently, it repeatedly
+# sleeps for 5s before multiplying the number of clients by a factor.
+# The '<>' prefix signifies that the factor "bounces" between 1.75 and
+# 1/1.75 when min_num_clients resp. max_num_clients are reached.
+#
+# Example invocation:
+#
+#     ./parameterized-locust.sh \
+#         --hosts "$Q3_HOSTS" \
+#         --multi 16 \
+#         --multi-workdir "$REPORT_DIR/clients" \
+#         --kazoo-handler gevent \
+#         --kazoo-timeout-s 60 \
+#         --ignore-connection-down \
+#         --min-wait 25 \
+#         --max-wait 50 \
+#         --stats-collect 100 \
+#         --zk-metrics-collect 100 \
+#         --report-dir "$REPORT_DIR" \
+#         --control-program "$CONTROL_PROGRAM" \
+#         --force \
+#         -- \
+#             --no-web \
+#             -c 16 -r 128 -t 120s \
+#             -f locust_set_with_controller.py
+
+import os
 import logging
 
 import gevent
@@ -11,13 +52,14 @@ from zk_metrics import register_zk_metrics
 from zk_locust.task_sets import ZKSetTaskSet
 
 logging.basicConfig()
+logging.getLogger('locust_extra.control').setLevel(logging.DEBUG)
 logging.getLogger('zk_metrics').setLevel(logging.DEBUG)
 
 _logger = logging.getLogger(__name__)
 _logger.setLevel(logging.DEBUG)
 
 
-def _controller_available(controller):
+def _coded_example(controller):
     controller.wait_initial_hatch_complete()
 
     sleep_s = 5
@@ -44,9 +86,11 @@ def _controller_available(controller):
         controller.start_hatching(num_clients=num_clients, hatch_rate=delta)
 
 
-register_extra_stats()
-register_controller(fn=_controller_available)
 register_zk_metrics()
+register_extra_stats()
+
+register_controller(
+    fn=None if os.getenv('LOCUST_EXTRA_CONTROL_PROGRAM') else _coded_example)
 
 
 class Set(ZKLocust):
