@@ -39,24 +39,28 @@ _ls_key_labels = {
 _zkm_plots = [
     {
         'label': 'Outstanding Requests',
+        'ylabel': 'Count',
         'name': 'outstanding_requests',
         'metrics': ['outstanding_requests'],
         'ignore_not_serving': True
     },
     {
         'label': 'Clients',
+        'ylabel': 'Count',
         'name': 'clients',
         'metrics': ['num_alive_connections'],
         'ignore_not_serving': True
     },
     {
         'label': 'Nodes',
+        'ylabel': 'Count',
         'name': 'nodes',
         'metrics': ['znode_count', 'ephemerals_count'],
         'ignore_not_serving': True
     },
     {
         'label': 'Watches',
+        'ylabel': 'Count',
         'name': 'watch_count',
         'metrics': ['watch_count'],
         'ignore_not_serving': True
@@ -178,6 +182,12 @@ def worker_alpha(n):
     return 2.0 / n
 
 
+def set_ax_labels(ax, *, x_is_relative=False, y_label=None):
+    ax.set_xlabel('Time (s)' if x_is_relative else 'Clock')
+    if y_label:
+        ax.set_ylabel(y_label)
+
+
 def plot_latencies(groups, latencies_base_path):
     fig = plt.figure()
     ax = fig.gca()
@@ -216,6 +226,8 @@ def plot_latencies(groups, latencies_base_path):
                 linestyle=linestyle,
                 ax=ax,
                 label=group.prefix_label(pc))
+
+    set_ax_labels(ax, x_is_relative=is_relative, y_label='Latency (ms)')
 
     for ext in _savefig_exts:
         fig.savefig(latencies_base_path + ext)
@@ -271,6 +283,8 @@ def plot_client_count(groups, naked_client_count_path):
                 group.prefix_label('ZK C.' + _per_worker) if j == 0 else '_')
 
     ax.legend(labels)
+
+    set_ax_labels(ax, x_is_relative=is_relative, y_label='Count')
 
     for ext in _savefig_exts:
         fig.savefig(naked_client_count_path + ext)
@@ -347,6 +361,7 @@ def plot_num_requests_per_1s(groups, dfs, client_dfs, num_requests_base_path):
 
     for ax in [req_ax, succ_ax]:
         ax.legend()
+        ax.set_ylabel('Count')
         ax.xaxis.label.set_visible(False)
         ax.tick_params(axis='x', which='both', labelbottom=False)
 
@@ -356,6 +371,8 @@ def plot_num_requests_per_1s(groups, dfs, client_dfs, num_requests_base_path):
         label.set_ha("right")
         label.set_rotation(30)
     fig.subplots_adjust(bottom=0.2)
+
+    set_ax_labels(fail_ax, x_is_relative=is_relative, y_label='Count')
 
     for ext in _savefig_exts:
         fig.savefig(num_requests_base_path + ext)
@@ -501,6 +518,7 @@ def plot_zkm_multi(groups, plot_def, base_path):
     fig.suptitle('ZooKeeper ' + plot_def['label'])
 
     metrics = plot_def['metrics']
+    ylabel = plot_def['ylabel']
 
     for host_i in range(n):
         ax = axes[host_i]
@@ -533,7 +551,10 @@ def plot_zkm_multi(groups, plot_def, base_path):
 
         if (host_i < n - 1):
             ax.xaxis.label.set_visible(False)
+            ax.set_ylabel(ylabel)
             ax.tick_params(axis='x', which='both', labelbottom=False)
+        else:
+            set_ax_labels(ax, y_label=ylabel)
 
     for ext in _savefig_exts:
         fig.savefig(plot_path + ext)
@@ -670,6 +691,8 @@ def process_errors(groups, base_path):
 
         if labels:
             ax.legend(labels)
+
+        set_ax_labels(ax, x_is_relative=is_relative, y_label='Count')
 
         naked_path = base_path
         if fig_j > 0:
