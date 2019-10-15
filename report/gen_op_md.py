@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+from abc import ABCMeta, abstractmethod
+
 import sys
 import os.path
 import logging
@@ -106,9 +108,15 @@ class Group(object):
         return self._ls_unmerged_df
 
 
-class FigureInfo(object):
-    def __init__(self, title, naked_path, exts):
+class FigInfo(object):
+    def __init__(self, fig, title):
+        self.fig = fig
         self.title = title
+
+
+class SavedFigInfo(object):
+    def __init__(self, fig_info, naked_path, exts):
+        self.fig_info = fig_info
         self.naked_path = naked_path
         self.exts = exts
 
@@ -166,9 +174,28 @@ def write_md(df, task_set, op, md_path, latencies_base_path,
         f.write('\n')
 
 
-def parse_bool(s):
-    # Really?
-    return distutils.util.strtobool(s)
+def option_getter(options, section):
+    def raw_getter(xkey):
+        v = options.get('.'.join(xkey))
+        if v is not None:
+            return v
+        xkey[0] = '*'
+        return options.get('.'.join(xkey))
+
+    def getter(*args, type=None, fallback=None):
+        xkey = [section] + list(args)
+        v = raw_getter(xkey)
+        if v is None:
+            return fallback
+        if type is None or type is str:
+            return v
+        if type is int:
+            return int(v)
+        if type is bool:
+            return distutils.util.strtobool(v)
+        raise ValueError(f"Don't know how to convert '{v}' into type {type}.")
+
+    return getter
 
 
 def relativize(df, *, index_base=None):
@@ -195,52 +222,89 @@ def set_ax_labels(ax, *, x_is_relative=False, y_label=None):
         ax.set_ylabel(y_label)
 
 
-def plot_latencies(groups, latencies_base_path, options):
-    fig = plt.figure()
-    ax = fig.gca()
+class AbstractPlotter(metaclass=ABCMeta):
+    @abstractmethod
+    def plot(self, groups):
+        pass
 
-    fig.suptitle('Operation Latencies')
+    def plot_and_save(self, groups, base_path, *, exts=None):
+        fig_infos = self.plot(groups)
+        return self.save(fig_infos, base_path, exts=exts)
 
-    is_relative = len(groups) > 1
-    do_shade = parse_bool(options.get('shade_latencies', 'True'))
+    def save(self, fig_infos, base_path, exts=None):
+        n = len(fig_infos)
+        saved_fig_infos = []
 
-    shaded_pcs = ['66%', '75%', '80%', '90%', '98%']
-    highlighted_pcs = [('50%', '-'), ('95%', '--'), ('99%', ':')]
+        if exts is None:
+            exts = _savefig_exts
 
-    for i in range(len(groups)):
-        is_main = i == 0
-        group = groups[i]
-        df = group.merged_client_stats()
-        color = _colors[i % len(_colors)]
+        for i in range(n):
+            fig_info = fig_infos[i]
 
-        if is_relative:
-            df = relativize(df)
+            naked_path = base_path if n == 1 else f'{base_path}_{i + 1}'
+            for ext in exts:
+                fig_info.fig.savefig(naked_path + ext)
 
-        if is_main and do_shade:
-            # Only shade first group.
-            for pc in shaded_pcs:
-                ax.fill_between(
-                    df.index,
-                    0,
-                    df[pc],
-                    facecolor=color,
-                    alpha=0.1,
+            saved_fig_infos.append(SavedFigInfo(fig_info, naked_path, exts))
+
+        return saved_fig_infos
+
+
+class LatenciesPlotter(AbstractPlotter):
+    def __init__(self, options={}):
+        get_option = option_getter(options, 'latencies')
+
+        self._shade = get_option('shade', type=bool, fallback=True)
+
+    def plot(self, groups):
+        fig = plt.figure()
+        ax = fig.gca()
+        title = 'Operation Latencies'
+
+        fig.suptitle(title)
+
+        is_relative = len(groups) > 1
+
+        shaded_pcs = ['66%', '75%', '80%', '90%', '98%']
+        highlighted_pcs = [('50%', '-'), ('95%', '--'), ('99%', ':')]
+
+        for i in range(len(groups)):
+            is_main = i == 0
+            group = groups[i]
+            df = group.merged_client_stats()
+            color = _colors[i % len(_colors)]
+
+            if is_relative:
+                df = relativize(df)
+
+            if is_main and self._shade:
+                # Only shade first group.
+                for pc in shaded_pcs:
+                    ax.fill_between(
+                        df.index,
+                        0,
+                        df[pc],
+                        facecolor=color,
+                        alpha=0.1,
+                        label=group.prefix_label(pc))
+
+            for (pc, linestyle) in highlighted_pcs:
+                df.plot.line(
+                    y=pc,
+                    color=color,
+                    linestyle=linestyle,
+                    ax=ax,
                     label=group.prefix_label(pc))
 
-        for (pc, linestyle) in highlighted_pcs:
-            df.plot.line(
-                y=pc,
-                color=color,
-                linestyle=linestyle,
-                ax=ax,
-                label=group.prefix_label(pc))
+        set_ax_labels(ax, x_is_relative=is_relative, y_label='Latency (ms)')
 
-    set_ax_labels(ax, x_is_relative=is_relative, y_label='Latency (ms)')
+        return [FigInfo(fig, title)]
 
-    for ext in _savefig_exts:
-        fig.savefig(latencies_base_path + ext)
 
-    plt.close(fig)
+def plot_latencies(groups, latencies_base_path, options):
+    plotter = LatenciesPlotter(options)
+
+    return plotter.plot_and_save(groups, latencies_base_path)
 
 
 def plot_client_count(groups, naked_client_count_path, options):
@@ -253,7 +317,7 @@ def plot_client_count(groups, naked_client_count_path, options):
     ax = fig.gca()
 
     col_names = ['user_count']
-    do_per_worker = parse_bool(options.get('per_worker', 'True'))
+    do_per_worker = True  #parse_bool(options.get('per_worker', 'True'))
 
     labels = []
 
@@ -713,7 +777,8 @@ def process_errors(groups, base_path):
         for ext in _savefig_exts:
             fig.savefig(naked_path + ext)
 
-        fig_infos.append(FigureInfo(key, naked_path, _savefig_exts))
+        fig_infos.append(
+            SavedFigInfo(FigInfo(fig, key), naked_path, _savefig_exts))
 
         plt.close(fig)
 
