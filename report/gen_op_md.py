@@ -126,7 +126,7 @@ def write_md(df, task_set, op, md_path, latencies_base_path,
             f.write('  * %s: %s\n' % (label.replace('#', '\\#'), v))
 
         if latencies_base_path:
-            f.write('\n### Latencies\n\n')
+            f.write('\n### Operation Latencies\n\n')
             f.write('\n![](%s)\n' % latencies_base_path)
 
         f.write('\n#### Percentiles\n\n')
@@ -181,6 +181,8 @@ def worker_alpha(n):
 def plot_latencies(groups, latencies_base_path):
     fig = plt.figure()
     ax = fig.gca()
+
+    fig.suptitle('Operation Latencies')
 
     is_relative = len(groups) > 1
 
