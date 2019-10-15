@@ -154,9 +154,9 @@ def write_md(df, task_set, op, md_path, latencies_base_path,
 
         if errors_fig_infos:
             f.write('#### Errors\n\n')
-            for fig in errors_fig_infos:
-                f.write('##### %s\n\n' % fig.title)
-                f.write('\n![](%s)\n\n' % fig.naked_path)
+            for saved_fig_info in errors_fig_infos:
+                f.write('##### %s\n\n' % saved_fig_info.fig_info.title)
+                f.write('\n![](%s)\n\n' % saved_fig_info.naked_path)
 
         if request_frequency_fig_infos:
             f.write('\n#### ZK Client Requests\n\n')
@@ -678,149 +678,151 @@ def plot_zkm_multi(groups, plot_def, base_path, options):
     return plotter.plot_and_save(groups, plot_path)
 
 
-def process_errors_single(df):
-    df = df[df.client_id.notnull()]
+class ErrorsPlotter(AbstractPlotter):
+    def __init__(self, options={}):
+        get_option = option_getter(options, 'errors')
 
-    if not len(df):
-        return None
+        self._per_worker = get_option('per_worker', type=bool, fallback=True)
 
-    encoded_errors = df.errors.fillna('')
-    deserialized = []
-    keys = set()
-    for error_json in encoded_errors:
-        if not error_json:
-            deserialized.append({})
-            continue
+    def _process_errors_single(self, df):
+        df = df[df.client_id.notnull()]
 
-        error_data = json.loads(error_json)
-        deserialized.append(error_data)
-        keys |= error_data.keys()
+        if not len(df):
+            return None
 
-    if not len(keys):
-        return None
-
-    new_columns = {}
-    for key in keys:
-        column_name = key
-        new_columns[column_name] = pd.Series(
-            name=column_name, index=df.index, data=0)
-
-    for i in range(len(encoded_errors)):
-        error_data = deserialized[i]
-        for key in keys:
-            count = error_data.get(key)
-            if not count:
+        encoded_errors = df.errors.fillna('')
+        deserialized = []
+        keys = set()
+        for error_json in encoded_errors:
+            if not error_json:
+                deserialized.append({})
                 continue
 
+            error_data = json.loads(error_json)
+            deserialized.append(error_data)
+            keys |= error_data.keys()
+
+        if not len(keys):
+            return None
+
+        new_columns = {}
+        for key in keys:
             column_name = key
-            s = new_columns[column_name]
-            s[df.index[i]] = count
+            new_columns[column_name] = pd.Series(
+                name=column_name, index=df.index, data=0)
 
-    return (df, new_columns)
+        for i in range(len(encoded_errors)):
+            error_data = deserialized[i]
+            for key in keys:
+                count = error_data.get(key)
+                if not count:
+                    continue
 
+                column_name = key
+                s = new_columns[column_name]
+                s[df.index[i]] = count
 
-def process_errors(groups, base_path):
-    is_relative = len(groups) > 1
-    keys = set()
-    dfs = []
-    series_dicts = []
-    sel_groups = []
+        return (df, new_columns)
 
-    for group in groups:
-        df = group.ls_df
+    def plot(self, groups):
+        is_relative = len(groups) > 1
+        keys = set()
+        dfs = []
+        series_dicts = []
+        sel_groups = []
 
-        if is_relative:
-            df = relativize(df)
+        for group in groups:
+            df = group.ls_df
 
-        pair = process_errors_single(df)
-        if not pair:
-            continue
+            if is_relative:
+                df = relativize(df)
 
-        df, series_dict = pair
+            pair = self._process_errors_single(df)
+            if not pair:
+                continue
 
-        keys |= series_dict.keys()
+            df, series_dict = pair
 
-        dfs.append(df)
-        series_dicts.append(series_dict)
-        sel_groups.append(group)
+            keys |= series_dict.keys()
 
-    fig_j = 0
-    figs = {}
-    for key in keys:
-        fig, ax = plt.subplots()
+            dfs.append(df)
+            series_dicts.append(series_dict)
+            sel_groups.append(group)
 
-        fig.suptitle(f'{key} Errors')
+        fig_j = 0
+        figs = {}
+        for key in keys:
+            fig, ax = plt.subplots()
+            title = f'{key} Errors'
 
-        figs[key] = (fig, ax, fig_j, [])
-        fig_j += 1
+            fig.suptitle(title)
 
-    for i in range(len(dfs)):
-        df = dfs[i]
-        series_dict = series_dicts[i]
-        group = sel_groups[i]
-        color = _colors[i % len(_colors)]
+            figs[key] = (fig, ax, title, fig_j, [])
+            fig_j += 1
+
+        for i in range(len(dfs)):
+            df = dfs[i]
+            series_dict = series_dicts[i]
+            group = sel_groups[i]
+            color = _colors[i % len(_colors)]
+
+            for key in keys:
+                series = series_dict.get(key)
+                if series is None:
+                    continue
+
+                fig, ax, title, fig_j, labels = figs[key]
+
+                data = {'client_id': df.client_id, key: series}
+
+                x_df = pd.DataFrame(data)
+                w_ids = x_df.client_id.unique()
+
+                x_df[key].rolling(
+                    len(w_ids), center=True).sum().plot.line(
+                        ax=ax, legend=False, color=color)
+
+                if len(w_ids) < 2 or not self._per_worker:
+                    continue
+
+                labels.append(group.prefix_label(key + ' (Total)'))
+
+                alpha = worker_alpha(len(w_ids))
+
+                for w_id in w_ids:
+                    plot_df = x_df[x_df.client_id == w_id]
+
+                    plot_df.plot.line(
+                        y=key,
+                        ax=ax,
+                        legend=False,
+                        color=color,
+                        linestyle=':',
+                        alpha=alpha)
+
+                    labels.append(
+                        group.prefix_label(key + _per_worker) if w_id ==
+                        w_ids[0] else '_')
+
+        fig_infos = []
 
         for key in keys:
-            series = series_dict.get(key)
-            if series is None:
-                continue
+            fig, ax, title, fig_j, labels = figs[key]
 
-            fig, ax, fig_j, labels = figs[key]
+            if labels:
+                ax.legend(labels)
 
-            data = {'client_id': df.client_id, key: series}
+            set_ax_labels(ax, x_is_relative=is_relative, y_label='Count')
 
-            x_df = pd.DataFrame(data)
-            w_ids = x_df.client_id.unique()
+            fig_infos.append(FigInfo(fig, title))
 
-            x_df[key].rolling(
-                len(w_ids), center=True).sum().plot.line(
-                    ax=ax, legend=False, color=color)
+        return fig_infos
 
-            if len(w_ids) < 2:
-                continue
 
-            labels.append(group.prefix_label(key + ' (Total)'))
+def process_errors(groups, base_path, options):
+    plotter = ErrorsPlotter(options)
 
-            alpha = worker_alpha(len(w_ids))
-
-            for w_id in w_ids:
-                plot_df = x_df[x_df.client_id == w_id]
-
-                plot_df.plot.line(
-                    y=key,
-                    ax=ax,
-                    legend=False,
-                    color=color,
-                    linestyle=':',
-                    alpha=alpha)
-
-                labels.append(
-                    group.prefix_label(key + _per_worker) if w_id ==
-                    w_ids[0] else '_')
-
-    fig_infos = []
-
-    for key in keys:
-        fig, ax, fig_j, labels = figs[key]
-
-        if labels:
-            ax.legend(labels)
-
-        set_ax_labels(ax, x_is_relative=is_relative, y_label='Count')
-
-        naked_path = base_path
-        if fig_j > 0:
-            naked_path += '_' + str(fig_j)
-
-        for ext in _savefig_exts:
-            fig.savefig(naked_path + ext)
-
-        fig_infos.append(
-            SavedFigInfo(FigInfo(fig, key), naked_path, _savefig_exts))
-
-        plt.close(fig)
-
-    return fig_infos
+    return plotter.plot_and_save(groups, base_path)
 
 
 def process_task_set_op_single(task_set, op, group, base_path, md_path,
@@ -840,7 +842,7 @@ def process_task_set_op_single(task_set, op, group, base_path, md_path,
     request_frequency_fig_infos = plot_request_frequency(
         [group], base_path + '_num_requests', options)
 
-    errors_fig_infos = process_errors([group], base_path + '_errors')
+    errors_fig_infos = process_errors([group], base_path + '_errors', options)
 
     zkm_fig_infos = []
     if len(zkm_df) > 0:
@@ -871,7 +873,7 @@ def process_task_set_op_multi(task_set, op, groups, base_path, md_path,
     request_frequency_fig_infos = plot_request_frequency(
         groups, base_path + '_num_requests', options)
 
-    errors_fig_infos = process_errors(groups, base_path + '_errors')
+    errors_fig_infos = process_errors(groups, base_path + '_errors', options)
 
     for plot_def in _zkm_plots:
         plot_zkm_multi(groups, plot_def, base_path, options)
