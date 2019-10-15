@@ -144,7 +144,7 @@ def write_md(df, task_set, op, md_path, latencies_base_path,
                 f.write('\n![](%s)\n\n' % fig.naked_path)
 
         if num_requests_base_path:
-            f.write('\n#### Requests\n\n')
+            f.write('\n#### ZK Client Requests\n\n')
             f.write('\n![](%s)\n' % num_requests_base_path)
 
         if user_count_base_path:
@@ -279,6 +279,9 @@ def plot_client_count(groups, naked_client_count_path):
 
 def plot_num_requests_per_1s(groups, dfs, client_dfs, num_requests_base_path):
     fig, axes = vsubplots(3)
+
+    fig.suptitle('ZK Client Requests')
+
     req_ax = axes[0]
     succ_ax = axes[1]
     fail_ax = axes[2]
