@@ -80,6 +80,7 @@ class ProgrammedHandler(object):
         self.min_num_clients = controller.get_num_clients()
         self.max_num_clients = self.min_num_clients * 4
         self.factor = None
+        self.addend = None
         while True:
             instr = self.program[self.pc]
             _logger.debug("Executing instruction[%d]: %s" % (self.pc, instr))
@@ -115,6 +116,29 @@ class ProgrammedHandler(object):
         self.controller.start_hatching(
             num_clients=num_clients, hatch_rate=hatch_rate)
 
+    def flip_at_bound(self):
+        num_clients = self.controller.get_num_clients()
+
+        if num_clients >= self.max_num_clients:
+            return -1
+        elif num_clients <= self.min_num_clients:
+            return 1
+        else:
+            return 0
+
+    def maybe_flip_at_bound(self, s, fallback=None):
+        v = fallback
+        flip = 0
+
+        if s and s.startswith('<>'):
+            flip = self.flip_at_bound()
+            if flip:
+                v = float(s[2:])
+        elif s is not None:
+            v = float(s)
+
+        return (v, flip)
+
     def _op_poll_initial_hatch_complete(self, sleep_ms):
         while not _initial_hatch_complete:
             self.sleep_ms(int(sleep_ms))
@@ -132,38 +156,31 @@ class ProgrammedHandler(object):
         hatch_rate = int(hatch_rate_str) if hatch_rate_str else None
         self.change_num_clients(int(num_clients_str), hatch_rate)
 
-    def _op_multiply_num_clients(self, f=None):
-        f = self.factor if f is None else float(f)
-        if f is None:
-            _logger.error('Cannot multiply_num_clients without factor')
+    def _op_add_num_clients(self, addend=None):
+        addend, flip = self.maybe_flip_at_bound(addend, self.addend)
+        if flip:
+            addend = addend * flip
+            self.addend = addend
+        if addend is None:
+            _logger.error('Cannot multiply_num_clients without a addend')
             return
+
         num_clients = self.controller.get_num_clients()
-        f_num_clients = num_clients * f
-        _logger.debug('num_clients: %d, f_num_clients: %d, f: %g', num_clients,
-                      f_num_clients, f)
+        new_num_clients = num_clients + addend
+        self.change_num_clients(new_num_clients)
+
+    def _op_multiply_num_clients(self, factor=None):
+        factor, flip = self.maybe_flip_at_bound(factor, self.factor)
+        if flip:
+            factor = factor**flip
+            self.factor = factor
+        if factor is None:
+            _logger.error('Cannot multiply_num_clients without a factor')
+            return
+
+        num_clients = self.controller.get_num_clients()
+        f_num_clients = num_clients * factor
         self.change_num_clients(int(f_num_clients))
-
-    def _op_flip_at_bound(self, base_f=None):
-        num_clients = self.controller.get_num_clients()
-        if self.factor is not None and (num_clients > self.min_num_clients and
-                                        num_clients < self.max_num_clients):
-            return
-
-        if base_f is not None:
-            base_f = float(base_f)
-        else:
-            if self.factor is None:
-                _logger.error('Cannot flip_at_bound without factor')
-                return
-            base_f = self.factor if self.factor >= 1.0 else 1 / self.factor
-
-        if num_clients >= self.max_num_clients:
-            self.factor = 1 / base_f
-        else:
-            self.factor = base_f
-
-        _logger.debug('Factor set to %g (num_clients: %d)', self.factor,
-                      num_clients)
 
     def _parse(self, program_text):
         program = []
