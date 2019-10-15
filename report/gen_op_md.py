@@ -203,6 +203,8 @@ def option_getter(options, section):
             return v
         if type is int:
             return int(v)
+        if type is float:
+            return float(v)
         if type is bool:
             return distutils.util.strtobool(v)
         raise ValueError(f"Don't know how to convert '{v}' into type {type}.")
@@ -215,11 +217,6 @@ def relativize(df, *, index_base=None):
         index_base = df.index.min()
 
     return df.set_index((df.index - index_base).total_seconds())
-
-
-def vsubplots(nrows):
-    figsize = (_figsize[0], _figsize[0] / 3 * nrows)
-    return plt.subplots(nrows=nrows, figsize=figsize)
 
 
 def worker_alpha(n):
@@ -235,6 +232,28 @@ def set_ax_labels(ax, *, x_is_relative=False, y_label=None):
 
 
 class AbstractPlotter(metaclass=ABCMeta):
+    def __init__(self, get_option=None):
+        self._figsize = _figsize
+        if get_option:
+            w = get_option('width', type=float)
+            if w and w > 0:
+                self._figsize = (w, self._figsize[1])
+            h = get_option('height', type=float)
+            if h and h > 0:
+                self._figsize = (self._figsize[0], h)
+
+    def fig(self):
+        fig = plt.figure(figsize=self._figsize)
+
+        return (fig, fig.gca())
+
+    def vsubplots(self, nrows):
+        if self._figsize is _figsize:
+            figsize = (_figsize[0], _figsize[1] / 3 * nrows)
+        else:
+            figsize = self._figsize
+        return plt.subplots(nrows=nrows, figsize=figsize)
+
     @abstractmethod
     def plot(self, groups):
         pass
@@ -266,11 +285,12 @@ class LatenciesPlotter(AbstractPlotter):
     def __init__(self, options={}):
         get_option = option_getter(options, 'latencies')
 
+        super(LatenciesPlotter, self).__init__(get_option=get_option)
+
         self._shade = get_option('shade', type=bool, fallback=True)
 
     def plot(self, groups):
-        fig = plt.figure()
-        ax = fig.gca()
+        fig, ax = self.fig()
         title = 'Operation Latencies'
 
         fig.suptitle(title)
@@ -323,17 +343,17 @@ class ClientCountPlotter(AbstractPlotter):
     def __init__(self, options={}):
         get_option = option_getter(options, 'client_count')
 
+        super(ClientCountPlotter, self).__init__(get_option=get_option)
+
         self._per_worker = get_option('per_worker', type=bool, fallback=True)
 
     def plot(self, groups):
         is_relative = len(groups) > 1
 
-        fig = plt.figure()
+        fig, ax = self.fig()
         title = 'ZK Client Count'
 
         fig.suptitle(title)
-
-        ax = fig.gca()
 
         col_names = ['user_count']
 
@@ -398,11 +418,13 @@ class RequestFrequencyPlotter(AbstractPlotter):
     def __init__(self, options={}):
         get_option = option_getter(options, 'request_frequency')
 
+        super(RequestFrequencyPlotter, self).__init__(get_option=get_option)
+
         self._per_worker = get_option('per_worker', type=bool, fallback=True)
 
     def _plot_num_requests_per_1s(self, groups, dfs, dfs_per_worker):
         n_axes = 3
-        fig, axes = vsubplots(n_axes)
+        fig, axes = self.vsubplots(n_axes)
         title = 'ZK Client Requests'
 
         fig.suptitle(title)
@@ -601,6 +623,10 @@ def plot_request_frequency(groups, base_path, options):
 
 class ZooKeeperMetricsPlotter(AbstractPlotter):
     def __init__(self, plot_def, options={}):
+        get_option = option_getter(options, plot_def['name'])
+
+        super(ZooKeeperMetricsPlotter, self).__init__(get_option=get_option)
+
         self._def = plot_def
 
     def plot(self, groups):
@@ -634,7 +660,7 @@ class ZooKeeperMetricsPlotter(AbstractPlotter):
         host_ports = list(host_ports)
         n = len(host_ports)
 
-        fig, axes = vsubplots(n)
+        fig, axes = self.vsubplots(n)
 
         fig.suptitle(title)
 
@@ -695,6 +721,8 @@ def plot_zkm_multi(groups, plot_def, base_path, options):
 class ErrorsPlotter(AbstractPlotter):
     def __init__(self, options={}):
         get_option = option_getter(options, 'errors')
+
+        super(ErrorsPlotter, self).__init__(get_option=get_option)
 
         self._per_worker = get_option('per_worker', type=bool, fallback=True)
 
@@ -766,7 +794,7 @@ class ErrorsPlotter(AbstractPlotter):
         fig_j = 0
         figs = {}
         for key in keys:
-            fig, ax = plt.subplots()
+            fig, ax = self.fig()
             title = f'{key} Errors'
 
             fig.suptitle(title)
