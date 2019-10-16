@@ -1,4 +1,6 @@
 import os
+import importlib
+import logging
 import json
 
 import kazoo.handlers.gevent
@@ -8,6 +10,8 @@ import kazoo.exceptions
 from kazoo.protocol.states import KeeperState
 
 from .backend_base import ZKLocustException, AbstractZKLocustClient
+
+_logger = logging.getLogger(__name__)
 
 
 class KazooLocustException(ZKLocustException):
@@ -44,24 +48,24 @@ def fetch_global_sasl_options():
 _global_sasl_options = fetch_global_sasl_options()
 
 _create_kazoo_client_var = 'KAZOO_LOCUST_CREATE_CLIENT'
-_create_kazoo_client_code = os.getenv(_create_kazoo_client_var)
+_create_kazoo_client_spec = os.getenv(_create_kazoo_client_var)
 
-if _create_kazoo_client_code:
+if _create_kazoo_client_spec:
 
-    def fn(**kwargs):
-        client_var = 'client'
-        locals_dict = {'kwargs': kwargs, client_var: None}
+    fn = None
 
-        exec(_create_kazoo_client_code, None, locals_dict)
+    try:
+        module_name, fn_name = _create_kazoo_client_spec.rsplit(
+            '.', maxsplit=1)
+        module = importlib.import_module(module_name)
+        fn = getattr(module, fn_name)
+    except Exception:
+        _logger.exception()
 
-        client = locals_dict.get(client_var)
-        if not client:
-            raise KazooLocustException(_create_kazoo_client_var +
-                                       ' expression ' +
-                                       repr(_create_kazoo_client_code) +
-                                       ' failed to set ' + repr(client_var))
-
-        return client
+    if not callable(fn):
+        raise KazooLocustException(
+            'Failed to resolve ' + _create_kazoo_client_var + ' spec ' +
+            repr(_create_kazoo_client_spec) + ' to a callable')
 
     _create_kazoo_client_fn = fn
 else:

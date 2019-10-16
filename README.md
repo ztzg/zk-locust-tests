@@ -167,19 +167,14 @@ systematically clears the latter when the flag argument is known.)
     The default is to not authenticate with the server;
 
   * `KAZOO_LOCUST_CREATE_CLIENT`: If set to a non-empty string,
-    contains code which is `exec`uted via Python to create the Kazoo
-    client.
+    contains the name of a module and "function" to invoke to
+    instantiate Kazoo clients.  E.g.:
 
-    The local scope contains a binding `kwargs` holding the normal set
-    of constructor arguments.  The created object must be assigned to
-    the `client` local variable.  E.g.:
+        export KAZOO_LOCUST_CREATE_CLIENT='my.custom.kazoo.create_client'
 
-        export KAZOO_LOCUST_CREATE_CLIENT='
-        new_kwargs = kwargs
-        new_kwargs.update({"my_extra_param": 42})
-
-        client = kazoo.client.KazooClient(**new_kwargs)
-        '
+    That callable ought to act as a replacement for the `KazooClient`
+    constructor, and is invoked with the "normal" set of constructor
+    arguments.
 
   * `--zk-metrics-collect`, `ZK_LOCUST_ZK_METRICS_COLLECT`: Determine
     the collection method used by the `zk_metrics` monitor; either
