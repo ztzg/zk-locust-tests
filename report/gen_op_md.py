@@ -10,6 +10,7 @@ import json
 import warnings
 import re
 import io
+import json
 
 import distutils.util
 
@@ -240,28 +241,13 @@ def write_md(df, task_set, op, md_path, latencies_base_path,
         f.write('\n')
 
 
-def create_nb(df, task_set, op, nb_path, op_path_prefix):
-    nb_template_path = os.path.join(
-        os.path.dirname(__file__), 'templates', 'single.py')
-    with open(nb_template_path) as f:
-        nb_template_data = f.read(None)
+def load_exec_nb_template(path, mapping):
+    with open(path) as f:
+        s = f.read(None)
 
-    nb_template = string.Template(nb_template_data)
+    template = string.Template(s)
 
-    nb_dir = os.path.dirname(nb_path)
-
-    def nb_relpath(path):
-        return os.path.relpath(path, nb_dir)
-
-    # TODO: Proper escaping!
-    mapping = {
-        'md_task_set': _md_escape(task_set),
-        'md_op': _md_escape(op),
-        'pys_ls_df_csv': nb_relpath(op_path_prefix + '.ls_subset.csv'),
-        'pys_zkm_df_csv': nb_relpath(op_path_prefix + '.zkm_subset.csv')
-    }
-
-    lines = nb_template.substitute(mapping).splitlines()
+    lines = template.substitute(mapping).splitlines()
 
     state = 'init'
     cells = []
@@ -307,6 +293,52 @@ def create_nb(df, task_set, op, nb_path, op_path_prefix):
 
     nb = nbf.v4.new_notebook()
     nb['cells'] = cells
+    return nb
+
+
+def create_nb_single(df, task_set, op, nb_path, op_path_prefix):
+    nb_dir = os.path.dirname(nb_path)
+
+    def nb_relpath(path):
+        return os.path.relpath(path, nb_dir)
+
+    # TODO: Proper escaping!
+    mapping = {
+        'md_task_set': _md_escape(task_set),
+        'md_op': _md_escape(op),
+        'pys_ls_df_csv': nb_relpath(op_path_prefix + '.ls_subset.csv'),
+        'pys_zkm_df_csv': nb_relpath(op_path_prefix + '.zkm_subset.csv')
+    }
+
+    nb = load_exec_nb_template(
+        os.path.join(os.path.dirname(__file__), 'templates', 'single.py'),
+        mapping)
+
+    nbf.write(nb, nb_path)
+
+
+def create_nb_multi(base_input_path, task_set, op, groups_data, nb_path):
+    nb_dir = os.path.dirname(nb_path)
+
+    def nb_relpath(path):
+        return os.path.relpath(path, nb_dir)
+
+    for group_data in groups_data:
+        for key in ['locust-stats', 'zk-metrics']:
+            path = os.path.join(base_input_path, group_data[key])
+            group_data[key] = nb_relpath(path)
+
+    # TODO: Proper escaping!
+    mapping = {
+        'md_task_set': _md_escape(task_set),
+        'md_op': _md_escape(op),
+        'py_groups_data_json': json.dumps(groups_data, indent=4)
+    }
+
+    nb = load_exec_nb_template(
+        os.path.join(os.path.dirname(__file__), 'templates', 'multi.py'),
+        mapping)
+
     nbf.write(nb, nb_path)
 
 
@@ -1053,7 +1085,7 @@ def process_task_set_op_single(task_set, op, group, op_path_prefix, md_path,
 
     nb_path = re.sub(r'\.md.*', '.ipynb', md_path)
 
-    create_nb(ls_df, task_set, op, nb_path, op_path_prefix)
+    create_nb_single(ls_df, task_set, op, nb_path, op_path_prefix)
 
 
 def process_task_set_op_multi(task_set, op, groups, op_path_prefix, md_path,
@@ -1106,6 +1138,10 @@ def process_task_set_op(base_input_path, task_set, op, data, op_path_prefix,
     else:
         process_task_set_op_multi(task_set, op, groups, op_path_prefix,
                                   md_path, options)
+
+        nb_path = op_path_prefix + '.fragment.ipynb'
+
+        create_nb_multi(base_input_path, task_set, op, data, nb_path)
 
 
 def process_fragments(base_input_path, fragments, output_base, subtree_root,
