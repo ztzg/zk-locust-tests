@@ -137,6 +137,8 @@ class KazooLocustClient(AbstractZKLocustClient):
         raise KazooLocustStoppedException()
 
     def is_connection_down(self):
+        if not self._started:
+            return False
         return self.get_zk_client().client_state is KeeperState.CONNECTING
 
     def create_default_node(self):
