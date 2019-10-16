@@ -376,7 +376,7 @@ def relativize(df, *, index_base=None):
 def worker_alpha(n):
     if n <= 2:
         return 1.0 / 3  # Keep some transparency
-    return 2.0 / n
+    return max(min(2.0 / n, 1.0), 0.1)
 
 
 def set_ax_labels(ax, *, x_is_relative=False, y_label=None):
