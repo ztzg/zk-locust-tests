@@ -127,10 +127,10 @@ polling without setting up a Web UI.
 
 ### "ZK Locust" Parameters
 
-The parameters can either be controlled by "flag" arguments to the
+Most parameters can either be controlled by "flag" arguments to the
 `parameterized-locust.sh` wrapper script (starting with `--`), or by
 setting (upper-case) environment variables.  (Note that the wrapper
-systematically clears the latter, except for "benchmark" parameters.)
+systematically clears the latter when the flag argument is known.)
 
   * `--hosts`, `ZK_LOCUST_HOSTS`: A ZooKeeper "connect string"
     including the addresses of the ensemble;
@@ -165,6 +165,21 @@ systematically clears the latter, except for "benchmark" parameters.)
   * `--kazoo-sasl-options`, `KAZOO_LOCUST_SASL_OPTIONS`: An optional
     JSON-encoded dictionary of SASL options for the Kazoo backend.
     The default is to not authenticate with the server;
+
+  * `KAZOO_LOCUST_CREATE_CLIENT`: If set to a non-empty string,
+    contains code which is `exec`uted via Python to create the Kazoo
+    client.
+
+    The local scope contains a binding `kwargs` holding the normal set
+    of constructor arguments.  The created object must be assigned to
+    the `client` local variable.  E.g.:
+
+        export KAZOO_LOCUST_CREATE_CLIENT='
+        new_kwargs = kwargs
+        new_kwargs.update({"my_extra_param": 42})
+
+        client = kazoo.client.KazooClient(**new_kwargs)
+        '
 
   * `--zk-metrics-collect`, `ZK_LOCUST_ZK_METRICS_COLLECT`: Determine
     the collection method used by the `zk_metrics` monitor; either

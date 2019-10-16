@@ -43,6 +43,30 @@ def fetch_global_sasl_options():
 
 _global_sasl_options = fetch_global_sasl_options()
 
+_create_kazoo_client_var = 'KAZOO_LOCUST_CREATE_CLIENT'
+_create_kazoo_client_code = os.getenv(_create_kazoo_client_var)
+
+if _create_kazoo_client_code:
+
+    def fn(**kwargs):
+        client_var = 'client'
+        locals_dict = {'kwargs': kwargs, client_var: None}
+
+        exec(_create_kazoo_client_code, None, locals_dict)
+
+        client = locals_dict.get(client_var)
+        if not client:
+            raise KazooLocustException(_create_kazoo_client_var +
+                                       ' expression ' +
+                                       repr(_create_kazoo_client_code) +
+                                       ' failed to set ' + repr(client_var))
+
+        return client
+
+    _create_kazoo_client_fn = fn
+else:
+    _create_kazoo_client_fn = kazoo.client.KazooClient
+
 
 class KazooLocustClient(AbstractZKLocustClient):
     _started = False
@@ -81,7 +105,7 @@ class KazooLocustClient(AbstractZKLocustClient):
         if timeout is not None:
             kwargs['timeout'] = timeout
 
-        self._set_zk_client(kazoo.client.KazooClient(hosts=hosts, **kwargs))
+        self._set_zk_client(_create_kazoo_client_fn(hosts=hosts, **kwargs))
 
         self._sasl_options = sasl_options
 
