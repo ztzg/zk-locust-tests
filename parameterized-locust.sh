@@ -109,7 +109,15 @@ while [ -z "$dashdash" -a "$#" -gt '0' ]; do
             shift 2
             ;;
         --report-jobs)
-            extra_report_args+=(-j "$2")
+            extra_report_args+=("-${1:8}" "$2")
+            shift 2
+            ;;
+        --report-option)
+            extra_report_args+=("-${1:8}" "$2" "$3")
+            shift 3
+            ;;
+        --report-nb|--report-no-nb|--report-md|--report-no-md)
+            extra_report_args+=("-${1:8}")
             shift 2
             ;;
         --force)
