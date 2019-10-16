@@ -190,7 +190,7 @@ class AbstractDispatcher(metaclass=ABCMeta):
             cause = None
         self.sleep_ms(ms, cause)
 
-    def _ping_ensemble(self, members):
+    def ping_ensemble(self, members):
         ups = []
         downs = []
         mark = time.time()
@@ -231,7 +231,7 @@ class RandomDispatcher(AbstractDispatcher):
         action = None
         while True:
             self.sleep_after(action)
-            ups, downs = self._ping_ensemble(members)
+            ups, downs = self.ping_ensemble(members)
             action, member = self._decide(
                 members, ups, downs, quorum_size=quorum_size)
             _logger.debug(
@@ -285,14 +285,14 @@ class ProgrammedDispatcher(AbstractDispatcher):
             member.ping()
 
     def _op_disable_leader(self):
-        ups, _ = self._ping_ensemble(self.members)
+        ups, _ = self.ping_ensemble(self.members)
         for member in ups:
             if member.is_leader():
                 self.disable(member)
                 break
 
     def _op_disable_follower(self):
-        ups, _ = self._ping_ensemble(self.members)
+        ups, _ = self.ping_ensemble(self.members)
         if len(ups) > self.quorum_size:
             candidates = sorted([m for m in ups if m.is_follower()],
                                 key=EnsembleMember.last_disabled_sort_key)
@@ -309,7 +309,7 @@ class ProgrammedDispatcher(AbstractDispatcher):
                 'alive members: %s', self.quorum_size, ups)
 
     def _op_enable_all(self):
-        _, downs = self._ping_ensemble(self.members)
+        _, downs = self.ping_ensemble(self.members)
         for member in downs:
             self.enable(member)
 
@@ -323,7 +323,17 @@ class ProgrammedDispatcher(AbstractDispatcher):
         return program
 
 
-def run_dispatcher_in_master(dispatcher):
+class FunctionDispatcher(AbstractDispatcher):
+    def __init__(self, *, fn, **kwargs):
+        super(FunctionDispatcher, self).__init__(**kwargs)
+
+        self.fn = fn
+
+    def run(self, hosts_and_ports, quorum_size):
+        self.fn(self, hosts_and_ports, quorum_size)
+
+
+def run_dispatcher_in_master(dispatcher, fn):
     while not locust.runners.locust_runner:
         gevent.sleep(0.1)
     if isinstance(locust.runners.locust_runner,
@@ -331,7 +341,9 @@ def run_dispatcher_in_master(dispatcher):
         return
 
     if not dispatcher:
-        if _config_program:
+        if fn:
+            dispatcher = FunctionDispatcher(fn=fn)
+        elif _config_program:
             dispatcher = ProgrammedDispatcher(program=_config_program)
         else:
             dispatcher = RandomDispatcher()
@@ -344,5 +356,5 @@ def run_dispatcher_in_master(dispatcher):
     dispatcher.run(hosts_and_ports, quorum_size)
 
 
-def register_dispatcher(*, dispatcher=None):
-    gevent.spawn(run_dispatcher_in_master, dispatcher)
+def register_dispatcher(*, dispatcher=None, fn=None):
+    gevent.spawn(run_dispatcher_in_master, dispatcher, fn)
