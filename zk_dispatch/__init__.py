@@ -190,6 +190,15 @@ class AbstractDispatcher(metaclass=ABCMeta):
             cause = None
         self.sleep_ms(ms, cause)
 
+    def wait_initial_hatch_complete(self, sleep_ms=250):
+        if _initial_hatch_complete:
+            return
+
+        _logger.debug('Polling for initial hatch complete; %dms', sleep_ms)
+        while not _initial_hatch_complete:
+            gevent.sleep(sleep_ms / 1000)
+        _logger.debug('Initial hatch complete')
+
     def ping_ensemble(self, members):
         ups = []
         downs = []
@@ -266,8 +275,7 @@ class ProgrammedDispatcher(AbstractDispatcher):
                 self.pc = 0
 
     def _op_poll_initial_hatch_complete(self, sleep_ms):
-        while not _initial_hatch_complete:
-            self.sleep_ms(int(sleep_ms))
+        self.wait_initial_hatch_complete(int(sleep_ms))
 
     def _op_sleep(self, sleep_ms):
         self.sleep_ms(int(sleep_ms))
