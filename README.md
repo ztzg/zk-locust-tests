@@ -209,15 +209,67 @@ systematically clears the latter when the flag argument is known.)
 ### Reporting Parameters
 
 The `parameterized-locust.sh` script can be directed to generate a
-report when the locust runner exists.  The unique reporting parameter
-currently is:
+report when the locust runner exists.  Here are some reporting
+parameters:
 
   * `--report-dir`: The name of a directory to use to store the
-    collected metrics and generate a "human-readable" report.
+    collected metrics and generate a "human-readable" report;
+
+  * `--report-jobs`, `--report-option`, `--report-nb`,
+    `--report-no-nb`, `--report-md`, `--report-no-md`: Forwarded to
+    the report generator.
+
+    E.g., `--report-no-nb` corresponds to `report.py`'s `--no-nb`.
+
+    See "Reporting Parameters for `report.py`", or `./report.py
+    --help`, for more information.
 
 It is recommended *not* to use `--zk-metrics-csv` or `--stats-csv` in
 conjunction with `--report-dir` to allow the script to use
 conventionally named files in that directory.
+
+### Reporting Parameters for `report.py`
+
+The `report.py` report generator can be used to generate reports from
+one or more existing datasets.  Here are some of its parameters (run
+`./report.py --help` for more):
+
+  * `--md`/`--no-md`: Generate Markdown-based report;
+  * `--nb`/`--no-nb`: Generate Jupyter notebook;
+  * `--option <key value>`: Set named report or plot option (see
+    below).
+
+Named report or plot options are passed via `--option`, which can be
+specified a number of times.  E.g.:
+
+    ./report.py ... \
+         --option latencies.shade False \
+         --option '*.width' 10 ...
+
+The keys themselves are made of two parts, "category" and "option,"
+separated by a dot.  `*` can be used as a wildcard for all categories.
+The categories are:
+
+  * `latencies`: "Operation Latencies" plot;
+  * `client_count`: "ZK Client Count" plot;
+  * `request_frequency`: "ZK Client Requests" plot;
+  * `outstanding_requests`: "ZooKeeper Outstanding Requests" plot;
+  * `clients`: "ZooKeeper Clients" plot;
+  * `nodes`: "ZooKeeper Nodes" plot;
+  * `watch_count`: "ZooKeeper Watches" plot;
+  * `errors`: All "Errors" plots.
+
+Common plot options are (`*` means: valid for many categories):
+
+  * `*.width`, `*.height`: The (floating-point) width/(resp.)height of
+    a plot in Matplotlib units (normally inches);
+
+  * `*.per_worker`: A boolean indicating whether to include a
+    "distribution" of per-worker (Locust "slave") curves on relevant
+    plots (default: `True`);
+
+  * `latencies.shade`: A boolean indicating whether to shade the
+    latencies plot (default: `True`);
 
 ## "Locustfiles" Starter Kit
 
