@@ -154,7 +154,7 @@ def cli(metrics_dir, labeled_metrics_dir, zk_metrics_csv, stats_csv,
             fragments.append(fragment)
 
     top_frags_dir = os.path.join(report_dir, 'fragments')
-    gen_op_md.process_fragments(report_dir, fragments, top_frags_dir,
+    gen_op_md.process_fragments(report_dir, fragments, top_frags_dir, 'mix',
                                 os.path.join(top_frags_dir, 'report.md'),
                                 options)
 

@@ -134,6 +134,15 @@ class SavedFigInfo(object):
 def write_md(df, task_set, op, md_path, latencies_base_path,
              client_count_fig_infos, request_frequency_fig_infos,
              errors_fig_infos, zkm_fig_infos):
+
+    # KLUDGE: We don't relativize paths and explicitly create broken
+    # references in intermediate report fragments.  This won't work
+    # when directly generating a combined report.
+
+    # md_dir = os.path.dirname(md_path)
+    def relpath(path):
+        return path  # os.path.relpath(path, start=md_dir)
+
     with open(md_path, 'w') as f:
         f.write("## Task set '%s', op '%s'\n\n" % (task_set, op))
 
@@ -151,7 +160,7 @@ def write_md(df, task_set, op, md_path, latencies_base_path,
 
         if latencies_base_path:
             f.write('\n### Operation Latencies\n\n')
-            f.write('\n![](%s)\n' % latencies_base_path)
+            f.write('\n![](%s)\n' % relpath(latencies_base_path))
 
         f.write('\n#### Percentiles\n\n')
         for pc in [
@@ -165,23 +174,23 @@ def write_md(df, task_set, op, md_path, latencies_base_path,
             f.write('#### Errors\n\n')
             for saved_fig_info in errors_fig_infos:
                 f.write('##### %s\n\n' % saved_fig_info.fig_info.title)
-                f.write('\n![](%s)\n\n' % saved_fig_info.naked_path)
+                f.write('\n![](%s)\n\n' % relpath(saved_fig_info.naked_path))
 
         if request_frequency_fig_infos:
             f.write('\n#### ZK Client Requests\n\n')
             for saved_fig_info in request_frequency_fig_infos:
-                f.write('\n![](%s)\n' % saved_fig_info.naked_path)
+                f.write('\n![](%s)\n' % relpath(saved_fig_info.naked_path))
 
         if client_count_fig_infos:
             f.write('\n#### ZK Client Count\n\n')
             for saved_fig_info in client_count_fig_infos:
-                f.write('\n![](%s)\n' % saved_fig_info.naked_path)
+                f.write('\n![](%s)\n' % relpath(saved_fig_info.naked_path))
 
         if zkm_fig_infos:
             f.write('\n### ZooKeeper Metrics\n\n')
             for saved_fig_info in zkm_fig_infos:
                 f.write('\n#### %s\n\n' % saved_fig_info.fig_info.title)
-                f.write('\n![](%s)\n' % saved_fig_info.naked_path)
+                f.write('\n![](%s)\n' % relpath(saved_fig_info.naked_path))
 
         f.write('\n')
 
@@ -892,58 +901,60 @@ def process_errors(groups, base_path, options):
     return plotter.plot_and_save(groups, base_path)
 
 
-def process_task_set_op_single(task_set, op, group, base_path, md_path,
+def process_task_set_op_single(task_set, op, group, op_path_prefix, md_path,
                                options):
     ls_df = group.ls_df
     zkm_df = group.zkm_df
     ls_merged_df = group.merged_client_stats()
 
-    latencies_base_path = None
+    latencies_op_path_prefix = None
     if len(ls_merged_df) > 0:
-        latencies_base_path = base_path + '_latencies'
-        plot_latencies([group], latencies_base_path, options)
+        latencies_op_path_prefix = op_path_prefix + '_latencies'
+        plot_latencies([group], latencies_op_path_prefix, options)
 
     client_count_fig_infos = plot_client_count(
-        [group], base_path + '_client_count', options)
+        [group], op_path_prefix + '_client_count', options)
 
     request_frequency_fig_infos = plot_request_frequency(
-        [group], base_path + '_num_requests', options)
+        [group], op_path_prefix + '_num_requests', options)
 
-    errors_fig_infos = process_errors([group], base_path + '_errors', options)
+    errors_fig_infos = process_errors([group], op_path_prefix + '_errors',
+                                      options)
 
     zkm_fig_infos = []
     if len(zkm_df) > 0:
         for plot_def in _zkm_plots:
-            fis = plot_zkm_multi([group], plot_def, base_path, options)
+            fis = plot_zkm_multi([group], plot_def, op_path_prefix, options)
             zkm_fig_infos += fis
 
-    write_md(ls_df, task_set, op, md_path, latencies_base_path,
+    write_md(ls_df, task_set, op, md_path, latencies_op_path_prefix,
              client_count_fig_infos, request_frequency_fig_infos,
              errors_fig_infos, zkm_fig_infos)
 
 
-def process_task_set_op_multi(task_set, op, groups, base_path, md_path,
+def process_task_set_op_multi(task_set, op, groups, op_path_prefix, md_path,
                               options):
-    latencies_base_path = None
+    latencies_op_path_prefix = None
     latencies_groups = []
     for group in groups:
         if len(group.merged_client_stats()) > 0:
-            latencies_base_path = base_path + '_latencies'
+            latencies_op_path_prefix = op_path_prefix + '_latencies'
             latencies_groups.append(group)
 
-    if latencies_base_path:
-        plot_latencies(latencies_groups, latencies_base_path, options)
+    if latencies_op_path_prefix:
+        plot_latencies(latencies_groups, latencies_op_path_prefix, options)
 
     client_count_fig_infos = plot_client_count(
-        groups, base_path + '_client_count', options)
+        groups, op_path_prefix + '_client_count', options)
 
     request_frequency_fig_infos = plot_request_frequency(
-        groups, base_path + '_num_requests', options)
+        groups, op_path_prefix + '_num_requests', options)
 
-    errors_fig_infos = process_errors(groups, base_path + '_errors', options)
+    errors_fig_infos = process_errors(groups, op_path_prefix + '_errors',
+                                      options)
 
     for plot_def in _zkm_plots:
-        plot_zkm_multi(groups, plot_def, base_path, options)
+        plot_zkm_multi(groups, plot_def, op_path_prefix, options)
 
 
 def load_group(base_input_path, data_item):
@@ -957,7 +968,7 @@ def load_group(base_input_path, data_item):
     return Group(sample_id, label, ls_df, zkm_df)
 
 
-def process_task_set_op(base_input_path, task_set, op, data, base_path,
+def process_task_set_op(base_input_path, task_set, op, data, op_path_prefix,
                         md_path, options):
     groups = [load_group(base_input_path, data_item) for data_item in data]
     is_unique = len(groups) == 1
@@ -966,32 +977,40 @@ def process_task_set_op(base_input_path, task_set, op, data, base_path,
         groups[0].is_unique = True
 
     if is_unique:
-        process_task_set_op_single(task_set, op, groups[0], base_path, md_path,
-                                   options)
+        process_task_set_op_single(task_set, op, groups[0], op_path_prefix,
+                                   md_path, options)
     else:
-        process_task_set_op_multi(task_set, op, groups, base_path, md_path,
-                                  options)
+        process_task_set_op_multi(task_set, op, groups, op_path_prefix,
+                                  md_path, options)
 
 
-def process_fragments(base_input_path, fragments, base_path, md_path, options):
+def process_fragments(base_input_path, fragments, output_base, subtree_root,
+                      md_path, options):
     frag_dict = {}
     for fragment in fragments:
         key = (fragment['task_set'], fragment['op'])
         frag_dict[key] = frag_dict.get(key, []) + fragment['data']
 
     for (task_set, op), data in frag_dict.items():
-        process_task_set_op(base_input_path, task_set, op, data, base_path,
-                            md_path, options)
+        if subtree_root:
+            op_base_dir = os.path.join(output_base, subtree_root, task_set)
+            os.makedirs(op_base_dir, exist_ok=True)
+            op_path_prefix = os.path.join(op_base_dir, op)
+        else:
+            op_path_prefix = output_base
+
+        process_task_set_op(base_input_path, task_set, op, data,
+                            op_path_prefix, md_path, options)
 
 
-def main(executable, metadata, base_path, md_path):
+def main(executable, metadata, output_base, md_path):
     with open(metadata) as f:
         lines = f.readlines()
 
     fragments = [json.loads(line) for line in lines]
     options = {}
 
-    process_fragments('.', fragments, base_path, md_path, options)
+    process_fragments('.', fragments, output_base, None, md_path, options)
 
 
 if __name__ == '__main__':
