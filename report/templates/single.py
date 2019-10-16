@@ -1,6 +1,5 @@
 #.
-#%config InlineBackend.figure_formats = ['svg']
-#%matplotlib inline
+#%matplotlib notebook
 
 import pandas as pd
 from IPython.display import display, Markdown

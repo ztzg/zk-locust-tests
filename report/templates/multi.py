@@ -1,6 +1,5 @@
 #.
-#%config InlineBackend.figure_formats = ['svg']
-#%matplotlib inline
+#%matplotlib notebook
 
 import json
 import pandas as pd
