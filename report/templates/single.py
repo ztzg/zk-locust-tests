@@ -17,7 +17,7 @@ plot_options = {
 ls_df = pd.read_csv('${pys_ls_df_csv}', index_col=0, parse_dates=True)
 zkm_df = pd.read_csv('${pys_zkm_df_csv}', index_col=0, parse_dates=True)
 
-group = gen_op_md.Group('0', None, ls_df, zkm_df)
+group = gen_op_md.Group(None, None, ls_df, zkm_df)
 
 # ## Summary
 
