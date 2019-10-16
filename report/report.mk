@@ -6,6 +6,9 @@ ZK_LOCUST_ZK_METRICS_CSV = zk-metrics.csv
 FRAGS_DIR = fragments
 FRAGS_ID =
 
+GEN_MD = 1
+GEN_NB =
+
 $(V).SILENT:
 
 -include $(FRAGS_DIR)/subsets.mk
@@ -14,13 +17,18 @@ TASK_SET_FRAG_JSONLS = \
 	$(addprefix $(FRAGS_DIR)/,$(addsuffix .fragment.jsonl,$(TASK_SET_OPS)))
 TASK_SET_FRAG_MDS = \
 	$(addprefix $(FRAGS_DIR)/,$(addsuffix .fragment.md,$(TASK_SET_OPS)))
+TASK_SET_FRAG_IPYNBS = \
+	$(addprefix $(FRAGS_DIR)/,$(addsuffix .fragment.ipynb,$(TASK_SET_OPS)))
 TASK_SET_MDS = \
 	$(addprefix $(FRAGS_DIR)/,$(addsuffix /task_set.md,$(TASK_SETS)))
 
+MD_TARGETS = $(if $(GEN_MD),report.html report.pdf)
+NB_TARGETS = $(if $(GEN_NB),$(TASK_SET_FRAG_IPYNBS))
+
 .PHONY: report
 report:						\
-		report.html			\
-		report.pdf
+		$(MD_TARGETS)			\
+		$(NB_TARGETS)
 
 $(FRAGS_DIR)/subsets.mk:			\
 		$(LOCUST_EXTRA_STATS_CSV)	\
@@ -82,11 +90,25 @@ $(FRAGS_DIR)/fragments.jsonl:			\
 %.fragment.md:					\
 		%.fragment.jsonl		\
 		$(SCRIPT_DIR)/gen_op_md.py
-	@echo '  FRAGMENT $*'
+	@echo '  FRAGMENT $* Markdown'
 	@mkdir -p $(dir $@)
 	$(SCRIPT_DIR)/gen_op_md.py		\
 	    $<					\
 	    $(patsubst %.fragment.md,%,$@)	\
+	    $@.tmp				\
+	    ''
+	@mv $@.tmp $@
+
+.PRECIOUS: %.fragment.ipynb
+%.fragment.ipynb:				\
+		%.fragment.jsonl		\
+		$(SCRIPT_DIR)/gen_op_md.py
+	@echo '  FRAGMENT $* Jupyter .ipynb'
+	@mkdir -p $(dir $@)
+	$(SCRIPT_DIR)/gen_op_md.py		\
+	    $<					\
+	    $(patsubst %.fragment.ipynb,%,$@)	\
+	    ''					\
 	    $@.tmp
 	@mv $@.tmp $@
 

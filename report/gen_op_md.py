@@ -1125,27 +1125,34 @@ def load_group(base_input_path, data_item):
 
 
 def process_task_set_op(base_input_path, task_set, op, data, op_path_prefix,
-                        md_path, options):
+                        md_path, nb_path, options):
     groups = [load_group(base_input_path, data_item) for data_item in data]
     is_unique = len(groups) == 1
 
     if is_unique:
         groups[0].is_unique = True
 
-    if is_unique:
-        process_task_set_op_single(task_set, op, groups[0], op_path_prefix,
-                                   md_path, options)
-    else:
-        process_task_set_op_multi(task_set, op, groups, op_path_prefix,
-                                  md_path, options)
+    if nb_path:
+        if is_unique:
+            create_nb_single(groups[0].ls_df, task_set, op, nb_path,
+                             op_path_prefix)
+        else:
+            if nb_path is True:
+                nb_path = op_path_prefix + '.fragment.ipynb'
 
-        nb_path = op_path_prefix + '.fragment.ipynb'
+            create_nb_multi(base_input_path, task_set, op, data, nb_path)
 
-        create_nb_multi(base_input_path, task_set, op, data, nb_path)
+    if md_path:
+        if is_unique:
+            process_task_set_op_single(task_set, op, groups[0], op_path_prefix,
+                                       md_path, options)
+        else:
+            process_task_set_op_multi(task_set, op, groups, op_path_prefix,
+                                      md_path, options)
 
 
 def process_fragments(base_input_path, fragments, output_base, subtree_root,
-                      md_path, options):
+                      md_path, nb_path, options):
     frag_dict = {}
     for fragment in fragments:
         key = (fragment['task_set'], fragment['op'])
@@ -1160,17 +1167,18 @@ def process_fragments(base_input_path, fragments, output_base, subtree_root,
             op_path_prefix = output_base
 
         process_task_set_op(base_input_path, task_set, op, data,
-                            op_path_prefix, md_path, options)
+                            op_path_prefix, md_path, nb_path, options)
 
 
-def main(executable, metadata, output_base, md_path):
+def main(executable, metadata, output_base, md_path, nb_path):
     with open(metadata) as f:
         lines = f.readlines()
 
     fragments = [json.loads(line) for line in lines]
     options = {}
 
-    process_fragments('.', fragments, output_base, None, md_path, options)
+    process_fragments('.', fragments, output_base, None, md_path, nb_path,
+                      options)
 
 
 if __name__ == '__main__':

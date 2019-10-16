@@ -39,11 +39,14 @@ if True:
     type=(str, str),
     multiple=True,
     help="Set named report or plot option")
+@click.option(
+    "--md/--no-md", default=True, help="Generate Markdown-based report")
+@click.option("--nb/--no-nb", default=False, help="Generate Jupyter notebook")
 @click.option("-f", "--force", is_flag=True, help="Possibly overwrite files")
 @click.option("-j", "--jobs", type=click.INT, help="Use parallel jobs")
 @click.option('-v', '--verbose', count=True)
 def cli(metrics_dir, labeled_metrics_dir, zk_metrics_csv, stats_csv,
-        report_dir, option, in_place, force, jobs, verbose):
+        report_dir, option, in_place, md, nb, force, jobs, verbose):
     if metrics_dir and labeled_metrics_dir:
         raise click.ClickException(
             '--metrics-dir and --labeled-metrics-dir cannot be used together.')
@@ -120,6 +123,7 @@ def cli(metrics_dir, labeled_metrics_dir, zk_metrics_csv, stats_csv,
         extra_args = [
             'LOCUST_EXTRA_STATS_CSV=' + os.path.abspath(stats_csvs[0]),
             'ZK_LOCUST_ZK_METRICS_CSV=' + os.path.abspath(zk_metrics_csvs[0]),
+            'GEN_MD=' + ('1' if md else ''), 'GEN_NB=' + ('1' if nb else ''),
             'report'
         ]
         os.execvp(make_args[0], make_args + extra_args)
@@ -155,8 +159,7 @@ def cli(metrics_dir, labeled_metrics_dir, zk_metrics_csv, stats_csv,
 
     top_frags_dir = os.path.join(report_dir, 'fragments')
     gen_op_md.process_fragments(report_dir, fragments, top_frags_dir, 'mix',
-                                os.path.join(top_frags_dir, 'report.md'),
-                                options)
+                                md, nb, options)
 
 
 if __name__ == "__main__":
