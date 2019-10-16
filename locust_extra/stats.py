@@ -146,8 +146,12 @@ class ClientStats(object):
         return cls(total, stats, errors, user_count)
 
 
-def collect_extra_stats(stats_csv_path, distrib_path, client_id, client_data,
-                        last_num_requests):
+def _invoke_fn(fn, worker_id, stats, errors, user_count):
+    fn(worker_id=worker_id, stats=stats, errors=errors, user_count=user_count)
+
+
+def collect_extra_stats(stats_csv_path, distrib_path, fn, client_id,
+                        client_data, last_num_requests):
     timestamp = format_timestamp()
 
     locust_runner = locust.runners.locust_runner
@@ -191,14 +195,21 @@ def collect_extra_stats(stats_csv_path, distrib_path, client_id, client_data,
         key = None if s is stats_total else (s.name, s.method)
         e = errors.get(key)
 
-        if stats_output:
+        if stats_output or fn:
             if client_stats:
                 client_s = client_stats.stats_for(key)
                 client_e = client_stats.errors_for(key)
                 if client_s:
-                    write_csv_row(timestamp, client_id, client_s, client_e,
-                                  client_stats.user_count, stats_output)
+                    if fn:
+                        _invoke_fn(fn, client_id, client_s, client_e,
+                                   client_stats.user_count)
+                    if stats_output:
+                        write_csv_row(timestamp, client_id, client_s, client_e,
+                                      client_stats.user_count, stats_output)
 
+        if fn:
+            _invoke_fn(fn, None, s, e, user_count)
+        if stats_output:
             write_csv_row(timestamp, None, s, e, user_count, stats_output)
 
         if distrib_output:
@@ -207,7 +218,7 @@ def collect_extra_stats(stats_csv_path, distrib_path, client_id, client_data,
     return num_requests
 
 
-def collect_extra_stats_loop(stats_csv_path, distrib_path, delay_s):
+def collect_extra_stats_loop(stats_csv_path, distrib_path, fn, delay_s):
     while not locust.runners.locust_runner:
         gevent.idle()
     if isinstance(locust.runners.locust_runner,
@@ -236,7 +247,8 @@ def collect_extra_stats_loop(stats_csv_path, distrib_path, delay_s):
         def on_slave_report(client_id, data):
             nonlocal num_requests
             num_requests = collect_extra_stats(stats_csv_path, distrib_path,
-                                               client_id, data, num_requests)
+                                               fn, client_id, data,
+                                               num_requests)
 
         locust.events.slave_report += on_slave_report
         # We are now hooked; let's abandon the greenlet.
@@ -244,19 +256,23 @@ def collect_extra_stats_loop(stats_csv_path, distrib_path, delay_s):
 
     # Not master; polling.
     while True:
-        num_requests = collect_extra_stats(stats_csv_path, distrib_path, None,
-                                           None, num_requests)
+        num_requests = collect_extra_stats(stats_csv_path, distrib_path, fn,
+                                           None, None, num_requests)
         gevent.sleep(delay_s)
 
 
-def spawn_collector(stats_csv_path, distrib_path, delay_ms):
-    gevent.spawn(collect_extra_stats_loop, stats_csv_path, distrib_path,
+def spawn_collector(stats_csv_path, distrib_path, fn, delay_ms):
+    gevent.spawn(collect_extra_stats_loop, stats_csv_path, distrib_path, fn,
                  delay_ms / 1000.0)
 
 
 def register_extra_stats(stats_csv_path=_stats_csv_path,
                          distrib_path=_distrib_path,
+                         fn=None,
                          delay_ms=_delay_ms):
-    if delay_ms > 0 and (stats_csv_path is not None
-                         or distrib_path is not None):
-        spawn_collector(stats_csv_path, distrib_path, delay_ms)
+    has_delay = delay_ms > 0
+    has_output = stats_csv_path is not None or distrib_path is not None
+    has_fn = fn is not None
+
+    if has_delay and (has_output or has_fn):
+        spawn_collector(stats_csv_path, distrib_path, fn, delay_ms)
