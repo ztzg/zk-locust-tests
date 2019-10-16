@@ -135,8 +135,9 @@ class AbstractSingleTimerOp(AbstractOp):
 
 
 class ZKConnectOp(AbstractSingleTimerOp):
-    def __init__(self, *args, **kwargs):
-        super(ZKConnectOp, self).__init__(*args, **kwargs)
+    def __init__(self, client, *, request_type='connect', **kwargs):
+        super(ZKConnectOp, self).__init__(
+            client, request_type=request_type, **kwargs)
 
     def op(self):
         try:
