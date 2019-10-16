@@ -4,9 +4,12 @@ from abc import ABCMeta, abstractmethod
 
 import sys
 import os.path
+import string
 import logging
 import json
 import warnings
+import re
+import io
 
 import distutils.util
 
@@ -14,6 +17,8 @@ import numpy as np
 import pandas as pd
 import pandas.plotting
 import matplotlib.pyplot as plt
+
+import nbformat as nbf
 
 pandas.plotting.register_matplotlib_converters()
 
@@ -131,6 +136,46 @@ class SavedFigInfo(object):
         self.exts = exts
 
 
+def extract_ls_subset(df, task_set, op):
+    task_set_pick = df.name == task_set
+    # "UNNAMED_OP" currently selects N/A-containing records.  See note
+    # in gen_subsets_mk.py
+    op_pick = df.method == op if op != 'UNNAMED_OP' else df.method.isna()
+    df = df[task_set_pick & op_pick]
+
+    req_diff = df.num_requests.diff()
+    df = df[req_diff.isnull() | req_diff > 0]
+
+    return df
+
+
+def _md_escape(s):
+    return s.replace('#', '\\#')
+
+
+def _md_heading(s, level):
+    return '%s %s' % ('#' * level, s)
+
+
+def gen_summary_md(df, level):
+    data = df.tail(1)
+
+    if not len(data):
+        return '*(Empty dataset)*'
+
+    f = io.StringIO()
+
+    # f.write(_md_heading('Summary\n\n', level))
+
+    for key, label in _ls_key_labels.items():
+        v = data[key][0]
+        if isinstance(v, float):
+            v = round(v, 3)
+        f.write('  * %s: %s\n' % (_md_escape(label), v))
+
+    return f.getvalue()
+
+
 def write_md(df, task_set, op, md_path, latencies_base_path,
              client_count_fig_infos, request_frequency_fig_infos,
              errors_fig_infos, zkm_fig_infos):
@@ -193,6 +238,76 @@ def write_md(df, task_set, op, md_path, latencies_base_path,
                 f.write('\n![](%s)\n' % relpath(saved_fig_info.naked_path))
 
         f.write('\n')
+
+
+def create_nb(df, task_set, op, nb_path, op_path_prefix):
+    nb_template_path = os.path.join(
+        os.path.dirname(__file__), 'templates', 'single.py')
+    with open(nb_template_path) as f:
+        nb_template_data = f.read(None)
+
+    nb_template = string.Template(nb_template_data)
+
+    nb_dir = os.path.dirname(nb_path)
+
+    def nb_relpath(path):
+        return os.path.relpath(path, nb_dir)
+
+    # TODO: Proper escaping!
+    mapping = {
+        'md_task_set': _md_escape(task_set),
+        'md_op': _md_escape(op),
+        'pys_ls_df_csv': nb_relpath(op_path_prefix + '.ls_subset.csv'),
+        'pys_zkm_df_csv': nb_relpath(op_path_prefix + '.zkm_subset.csv')
+    }
+
+    lines = nb_template.substitute(mapping).splitlines()
+
+    state = 'init'
+    cells = []
+    acc = []
+
+    def flush():
+        nonlocal acc
+        if not acc:
+            return
+        s = '\n'.join(acc).strip()
+        acc = []
+        if state == 'code':
+            cell = nbf.v4.new_code_cell(s)
+        elif state == 'md':
+            cell = nbf.v4.new_markdown_cell(s)
+        else:
+            raise Exception(f'Unexpected st {state!r}, s {s!r}')
+        cells.append(cell)
+
+    for line in lines:
+        if line.startswith('#.'):
+            flush()
+            state = 'code'
+        elif state == 'code' and line.startswith('#%'):
+            acc.append(line[1:])
+        elif state == 'code' and not line.startswith('#'):
+            acc.append(line)
+        elif line.startswith('# '):
+            if state != 'md':
+                flush()
+                state = 'md'
+            acc.append(line[2:])
+        elif state == 'md' and line == '#':
+            acc.append('')
+        elif not line.strip():
+            acc.append('')
+        else:
+            if state != 'code':
+                flush()
+                state = 'code'
+            acc.append(line)
+    flush()
+
+    nb = nbf.v4.new_notebook()
+    nb['cells'] = cells
+    nbf.write(nb, nb_path)
 
 
 def option_getter(options, section):
@@ -745,6 +860,13 @@ def plot_zkm_multi(groups, plot_def, base_path, options):
     return plotter.plot_and_save(groups, plot_path)
 
 
+def get_zkm_plot_def(name):
+    for plot_def in _zkm_plots:
+        if plot_def['name'] == name:
+            return plot_def
+    raise ValueError(f'Unknown ZK plot name {name!r}')
+
+
 class ErrorsPlotter(AbstractPlotter):
     def __init__(self, options={}):
         get_option = option_getter(options, 'errors')
@@ -928,6 +1050,10 @@ def process_task_set_op_single(task_set, op, group, op_path_prefix, md_path,
     write_md(ls_df, task_set, op, md_path, latencies_op_path_prefix,
              client_count_fig_infos, request_frequency_fig_infos,
              errors_fig_infos, zkm_fig_infos)
+
+    nb_path = re.sub(r'\.md.*', '.ipynb', md_path)
+
+    create_nb(ls_df, task_set, op, nb_path, op_path_prefix)
 
 
 def process_task_set_op_multi(task_set, op, groups, op_path_prefix, md_path,
