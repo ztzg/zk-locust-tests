@@ -49,6 +49,13 @@ class Controller(object):
         while not _initial_hatch_complete:
             gevent.sleep(sleep_ms / 1000)
 
+    def sleep_ms(self, ms, cause=None):
+        msg = 'Sleeping %dms' % ms
+        if cause:
+            msg += ' ' + cause
+        _logger.debug(msg)
+        gevent.sleep(ms / 1000)
+
     def get_num_clients(self):
         return self.runner.num_clients
 
@@ -91,11 +98,7 @@ class ProgrammedHandler(object):
                 self.pc = 0
 
     def sleep_ms(self, ms, cause=None):
-        msg = 'Sleeping %dms' % ms
-        if cause:
-            msg += ' ' + cause
-        _logger.debug(msg)
-        gevent.sleep(ms / 1000)
+        self.controller.sleep_ms(ms, cause=cause)
 
     def change_num_clients(self, num_clients, hatch_rate=None):
         num_clients = min(self.max_num_clients,
