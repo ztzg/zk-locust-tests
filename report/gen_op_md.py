@@ -208,12 +208,10 @@ def option_getter(options, section):
         v = raw_getter(xkey)
         if v is None:
             return fallback
-        if type is None or type is str:
+        if type is None or isinstance(v, type):
             return v
-        if type is int:
-            return int(v)
-        if type is float:
-            return float(v)
+        if type in (int, float):
+            return type(v)
         if type is bool:
             return distutils.util.strtobool(v)
         raise ValueError(f"Don't know how to convert '{v}' into type {type}.")
