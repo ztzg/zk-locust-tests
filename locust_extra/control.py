@@ -13,13 +13,14 @@ controller_available = events.EventHook()
 
 RUNNER_LOCAL, RUNNER_MASTER, RUNNER_SLAVE = ["local", "master", "slave"]
 
-_initial_hatch_complete = False
+_generation = 0
+
 _config_program = os.getenv('LOCUST_EXTRA_CONTROL_PROGRAM')
 
 
 def on_hatch_complete(user_count):
-    global _initial_hatch_complete
-    _initial_hatch_complete = True
+    global _generation
+    _generation += 1
 
 
 events.hatch_complete += on_hatch_complete
@@ -43,10 +44,9 @@ def _wait_runner_kind():
 class Controller(object):
     def __init__(self, runner):
         self.runner = runner
-        self.client_count = None
 
     def wait_initial_hatch_complete(self, sleep_ms=250):
-        while not _initial_hatch_complete:
+        while not _generation:
             gevent.sleep(sleep_ms / 1000)
 
     def sleep_ms(self, ms, cause=None):
@@ -55,6 +55,9 @@ class Controller(object):
             msg += ' ' + cause
         _logger.debug(msg)
         gevent.sleep(ms / 1000)
+
+    def get_generation(self):
+        return _generation
 
     def get_num_clients(self):
         return self.runner.num_clients
@@ -143,8 +146,7 @@ class ProgrammedHandler(object):
         return (v, flip)
 
     def _op_poll_initial_hatch_complete(self, sleep_ms):
-        while not _initial_hatch_complete:
-            self.sleep_ms(int(sleep_ms))
+        self.wait_initial_hatch_complete(int(sleep_ms))
 
     def _op_sleep(self, sleep_ms):
         self.sleep_ms(int(sleep_ms))
@@ -210,7 +212,8 @@ def _controller_poll_runner(fn):
     kind = _wait_runner_kind()
     if kind in [RUNNER_LOCAL, RUNNER_MASTER]:
         _startup(locust.runners.locust_runner, fn)
-    # else: abandon greenlet.
+    # else: Remove useless handler and abandon greenlet.
+    events.hatch_complete -= on_hatch_complete
 
 
 def register_controller(fn=None):
