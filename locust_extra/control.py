@@ -62,6 +62,9 @@ class Controller(object):
     def get_num_clients(self):
         return self.runner.num_clients
 
+    def get_user_count(self):
+        return self.runner.user_count
+
     def get_hatch_rate(self):
         return self.runner.hatch_rate
 
