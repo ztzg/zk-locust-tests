@@ -348,6 +348,7 @@ class FunctionDispatcher(AbstractDispatcher):
 
     def run(self, hosts_and_ports, quorum_size):
         members = [EnsembleMember(hp) for hp in hosts_and_ports]
+        _logger.debug('Invoking function %r', self.fn)
         self.fn(
             controller=self,
             hosts_and_ports=hosts_and_ports,
