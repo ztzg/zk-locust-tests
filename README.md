@@ -6,12 +6,13 @@ An experimental "test harness" for ZooKeeper.
 
 ## Quick Start
 
- 1. Install [Locust](https://locust.io/).  (Versions 0.9.0 and HEAD
-    have been tested, with Python 3.7.4.)
+ 1. Install [Locust](https://locust.io/).  (Tested with version
+    0.11.0.  See note in `locust_max_load_seeker.py` if you use a
+    newer version.);
 
  2. Install [Kazoo](https://kazoo.readthedocs.io/en/latest/).
-    (Versions 2.6.1 and `HEAD` have been tested.  `HEAD` is required
-    for SASL support.)
+    (Versions 2.6.1 and `HEAD` as of 2019-08-06 have been tested.
+    `HEAD` is required for SASL support.)
 
  3. Install and configure ZooKeeper (left as an exercise for the
     reader).
@@ -82,8 +83,8 @@ A number of utilities are provided in the `zk_locust` module:
 
 ## Extended Statistics Utilities
 
-The `locust_extra.stats` module allows to collect an extended set of
-statistics compared to Locust's normal `--csv` parameter.
+The `locust_extra.stats` module enables the collection of an extended
+set of statistics (compared to Locust's `--csv` parameter).
 
 A Locust script can enable the monitor by including the following bit:
 
@@ -91,9 +92,16 @@ A Locust script can enable the monitor by including the following bit:
     register_extra_stats()
 
 The `--stats-collect` / `LOCUST_EXTRA_STATS_COLLECT` and `--stats-csv`
-/ `LOCUST_EXTRA_STATS_CSV` parameters (or the "distrib" equivalent)
-direct the dumping of Locust statistics as time series.  See
-"Parameters" below for details.
+/ `LOCUST_EXTRA_STATS_CSV` parameters direct the module to dump Locust
+statistics as a "time series."  (See "Parameters" below for details.)
+
+## Control Utilities
+
+The `locust_extra.control` module provides a mechanism and utilities
+for dynamically controlling the Locust "runner," including dynamically
+changing the number of clients.
+
+An example is provided in `locust_set_with_controller.py`.
 
 ## ZooKeeper Metrics Utilities
 
@@ -122,6 +130,16 @@ Points 1/ and 2/ can help interactive exploration, whereas 3/ enables
 "offline" data analysis.  Alternatively, the collection parameter can
 be set to an integer number of milliseconds to perform Locust-side
 polling without setting up a Web UI.
+
+## ZooKeeper Ensemble Utilities
+
+The `zk_dispatch` module provides a mechanism and utilities for
+manipulating with the ZooKeeper ensemble.
+
+It can for example disable the leader and/or other members, forcing an
+election or migration of the affected clients.
+
+An example is provided in `locust_set_with_dispatcher.py`.
 
 ## Parameters
 
@@ -193,6 +211,28 @@ systematically clears the latter when the flag argument is known.)
 
   * `--stats-distrib`, `LOCUST_EXTRA_STATS_DISTRIB`: Path to the file
     in which to collect full (rounded) distributions.
+
+  * `ZK_DISPATCH_DISABLE_SCRIPT`, `ZK_DISPATCH_ENABLE_SCRIPT`: The
+    `zk_dispatch` module does not directly implement, but rather
+    delegates ensemble member disable/enable operations to these
+    scripts, as they tend to be very environment-specific.
+
+    These shell commands are executed in an environment which contains
+    additional variables denoting the targeted member:
+
+      * `ZK_MEMBER_HOST_AND_PORT`: The "full" member specification as
+        extracted from the ZooKeeper connect string, e.g. `member2:2181`;
+
+      * `ZK_MEMBER_HOST`: The member's host name, e.g. `member2`;
+
+      * `ZK_MEMBER_PORT`: The member's port number, e.g. `2181`;
+
+      * `ZK_MEMBER_STATE`: The last-known state of the targeted
+        member; one of `unknown`, `follower` or `leader`.
+
+    E.g.:
+
+        `export ZK_DISPATCH_ENABLE_SCRIPT='my-zk-enable "$ZK_MEMBER_HOST"'`
 
   * `--bench-*`: As a special case, an open-ended set of "benchmark"
     parameters is accepted; those are not validated and simply
