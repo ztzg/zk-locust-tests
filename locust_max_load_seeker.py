@@ -24,9 +24,8 @@
 # can generate "interesting" response curves such as the ones in
 # `doc/locust_max_load_binary_search.html`.  The "ZK Client Count"
 # plot shows an intense initial ramp-up of ZK Locust clients, followed
-# by a strong decrease as the error rate spikes.  The script then
-# tries and continually adjusts the ramp-up/ramp-down rate following
-# the error rate.
+# by a decrease as the error rate spikes.  The script then tries and
+# continually adjusts the ramp-up/ramp-down rate.
 #
 # Note that this is an initial, mostly-untested proof-of-concept at
 # this point.  The analysis ought to be quite a bit smarter, and more
@@ -38,6 +37,7 @@ import logging
 
 import gevent.thread
 import gevent.queue
+import gevent.event
 
 from zk_locust import ZKLocust
 from locust_extra.stats import register_extra_stats
@@ -54,25 +54,30 @@ logging.getLogger('zk_dispatch').setLevel(_logging_level)
 logging.getLogger('zk_metrics').setLevel(_logging_level)
 logging.getLogger('locust_extra.control').setLevel(_logging_level)
 
+# Ignore connection issues when trying to gather metrics
+logging.getLogger('urllib3.connectionpool').setLevel(logging.ERROR)
+
 _logger = logging.getLogger(__name__)
 _logger.setLevel(_logging_level)
 
 _ensemble_queue = gevent.queue.Queue(maxsize=1)
 _clients_queue = gevent.queue.Queue(maxsize=1)
+_stats_event = gevent.event.Event()
 
 _errors_pair = None
 _errors_lock = gevent.thread.LockType()
 
 
-def _zk_ensemble_manager(controller, hosts_and_ports, quorum_size):
+def _zk_ensemble_manager(controller, members, **kwargs):
     controller.wait_initial_hatch_complete()
 
     while True:
+        # Wait for "continue" signal
         _clients_queue.get()
-        _logger.debug('TODO: Degrade ensemble')
+        controller.disable_leader(members)
         controller.sleep_ms(1000)
-        _logger.debug('TODO: Heal ensemble')
-        controller.sleep_ms(7000)
+        controller.enable_all(members)
+        # Send "continue" token
         _ensemble_queue.put(True)
 
 
@@ -80,11 +85,11 @@ register_dispatcher(fn=_zk_ensemble_manager)
 
 
 def _count_errors(errors_map):
-    total_count = 0
-    if errors_map:
-        for count in errors_map.values():
-            total_count += count
-    return total_count
+    if not errors_map:
+        return 0
+
+    # We only care about session expiration for now.
+    return errors_map.get("SessionExpiredError()", 0)
 
 
 def _compute_error_rate(last_tuple):
@@ -92,88 +97,123 @@ def _compute_error_rate(last_tuple):
         errors_pair = _errors_pair
 
     if not errors_pair:
-        return (0, None)
+        return (0, 0, None)
 
     at, errors_map = errors_pair
     count = _count_errors(errors_map)
     next_tuple = (at, count)
 
     if not last_tuple:
-        return (0, next_tuple)
+        return (0, 0, next_tuple)
 
     last_at, last_count = last_tuple
 
-    delta_t = at - last_at
-    delta_count = count - last_count
-    if delta_t <= 0 or delta_count <= 0:
-        return (0, None)
+    dt = at - last_at
+    derr = count - last_count
+    if dt <= 0 or derr < 0:
+        _logger.warn(
+            'Unexpected error values dt=%d, derr=%d, '
+            'last_tuple=%s, errors_pair=%s', dt, derr, repr(last_tuple),
+            repr(errors_pair))
+        return (0, 0, None)
 
-    return (delta_count / delta_t, next_tuple)
+    return (derr, dt, next_tuple)
 
 
 def _locust_clients_manager(controller):
     controller.wait_initial_hatch_complete()
 
     last_error_mark = None
-    last_error_rate = 0
-    last_num_clients = controller.get_num_clients()
+
+    num_workers = controller.get_num_workers()
+    exp_clients = controller.get_user_count()
 
     base_f = 4
     f = base_f
 
+    max_new_clients = num_workers * 64
+
     while True:
-        controller.sleep_ms(7000)
+        controller.sleep_ms(5000)
 
-        current_num_clients = controller.get_num_clients()
+        # Send "continue" token
+        _clients_queue.put(True)
 
-        error_rate, last_error_mark = _compute_error_rate(last_error_mark)
+        # Wait for "continue" signal
+        _ensemble_queue.get()
+
+        controller.sleep_ms(5000)
+
+        # Note: We have to look at the actual running count, which is
+        # "published" at the same time as statistics--so we wait for
+        # the next report.
+        _stats_event.clear()
+        _stats_event.wait()
+        act_clients = controller.get_user_count()
+        _logger.debug('Current client count: %d', act_clients)
+
+        generation = controller.get_generation()
+
+        derr, dt, last_error_mark = _compute_error_rate(last_error_mark)
 
         is_failing = False
 
-        if error_rate > last_error_rate * 2:
-            _logger.info('Noticed increased error rate')
+        if derr > 0:
+            _logger.info('Noticed %r new errors in %gs', derr, dt)
             is_failing = True
 
-        if current_num_clients < last_num_clients:
-            _logger.info('Noticed %d dead clients',
-                         last_num_clients - current_num_clients)
+        if act_clients < exp_clients:
+            _logger.info('Noticed %r failed clients; exp_clients=%r',
+                         exp_clients - act_clients, exp_clients)
             is_failing = True
 
         if is_failing:
             # Reduce rate, so that we won't come back so fast
-            base_f = max(base_f / 2, 1.125)
+            base_f = max(base_f / 4, 1 + 1 / max_new_clients)
             # And back off
-            f = 1 / base_f
-        elif error_rate == 0 or error_rate < last_error_rate / 2:
+            f = max(1 / base_f, 3 / 4)
+        elif derr == 0:
             f = base_f
 
-        num_clients = int(current_num_clients * f)
-        delta = num_clients - current_num_clients
+        exp_clients = act_clients
 
-        if delta != 0:
+        num_clients = int(act_clients * f)
+        num_clients = min(num_clients, act_clients + max_new_clients)
+        num_clients = max(num_clients, num_workers)
+
+        if num_clients != act_clients:
             _logger.debug(
-                f'Adjusting num_clients (%s), error_rate=%s, f=%s, current_num_clients=%s, num_clients=%s, delta=%s',
-                'increase' if delta > 0 else 'decrease', error_rate, f,
-                current_num_clients, num_clients, delta)
+                'Adjusting client count (%r); derr=%r, dt=%gs, f=%r, '
+                'act_clients=%r, num_clients=%r', num_clients - act_clients,
+                derr, dt, f, act_clients, num_clients)
+
+            # KLUDGE: Locust 0.11.0 looks at the wrong property
+            # (num_clients instead of user_count) when computing the
+            # number of instances to spawn/kill!  We try compensating
+            # for it here.
+            dx = controller.get_num_clients() - controller.get_user_count()
 
             controller.start_hatching(
-                num_clients=num_clients, hatch_rate=abs(delta))
+                num_clients=num_clients + dx, hatch_rate=num_clients)
 
-        last_error_rate = error_rate
-        last_num_clients = num_clients
+            if num_clients > act_clients:
+                # Wait for new "generation."
+                while controller.get_generation() == generation:
+                    controller.sleep_ms(250)
 
-        controller.sleep_ms(1000)
-        _clients_queue.put(True)
-        _ensemble_queue.get()
+            exp_clients = num_clients
 
 
 register_controller(fn=_locust_clients_manager)
 
 
-def _locust_stats_handler(*, worker_id=None, errors=None, **kwargs):
+def _locust_stats_handler(*, worker_id, errors, **kwargs):
     # Ignore per-worker details for now.
     if worker_id:
         return
+
+    # Unlock any waiter.
+    _stats_event.set()
 
     if not errors:
         return
@@ -183,6 +223,8 @@ def _locust_stats_handler(*, worker_id=None, errors=None, **kwargs):
     with _errors_lock:
         global _errors_pair
         _errors_pair = (at, errors)
+
+    # _logger.debug('Stats updated')
 
 
 register_extra_stats(fn=_locust_stats_handler)
