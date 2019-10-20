@@ -2,7 +2,7 @@
 # ZooKeeper clients.
 #
 # It can be run without a control program, in which case it will use
-# the "_coded_example" function below, or with a program such as:
+# the "_coded_control_example" function below, or with a program such as:
 #
 #     CONTROL_PROGRAM='
 #         poll_initial_hatch_complete 500
@@ -58,8 +58,11 @@ logging.getLogger('zk_metrics').setLevel(logging.DEBUG)
 _logger = logging.getLogger(__name__)
 _logger.setLevel(logging.DEBUG)
 
+register_zk_metrics()
+register_extra_stats()
 
-def _coded_example(controller):
+
+def _coded_control_example(controller):
     controller.wait_initial_hatch_complete()
 
     sleep_s = 5
@@ -86,11 +89,9 @@ def _coded_example(controller):
         controller.start_hatching(num_clients=num_clients, hatch_rate=delta)
 
 
-register_zk_metrics()
-register_extra_stats()
-
 register_controller(
-    fn=None if os.getenv('LOCUST_EXTRA_CONTROL_PROGRAM') else _coded_example)
+    fn=None if os.getenv('LOCUST_EXTRA_CONTROL_PROGRAM'
+                         ) else _coded_control_example)
 
 
 class Set(ZKLocust):
