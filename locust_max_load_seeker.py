@@ -19,7 +19,7 @@
 #         -- \
 #             --no-web \
 #             -c 64 -r 128 -t 240s \
-#             -f locust_max_load_binary_search.py
+#             -f locust_max_load_seeker.py
 #
 # can generate "interesting" response curves such as the ones in
 # `doc/locust_max_load_binary_search.html`.  The "ZK Client Count"
