@@ -42,8 +42,9 @@ def _wait_runner_kind():
 
 
 class Controller(object):
-    def __init__(self, runner):
+    def __init__(self, runner, kind):
         self.runner = runner
+        self._runner_kind = kind
 
     def wait_initial_hatch_complete(self, sleep_ms=250):
         while not _generation:
@@ -55,6 +56,12 @@ class Controller(object):
             msg += ' ' + cause
         _logger.debug(msg)
         gevent.sleep(ms / 1000)
+
+    def get_num_workers(self):
+        if self._runner_kind is RUNNER_MASTER:
+            return self.runner.slave_count
+        else:
+            return 1
 
     def get_generation(self):
         return _generation
@@ -200,8 +207,8 @@ class ProgrammedHandler(object):
         return program
 
 
-def _startup(runner, fn):
-    controller = Controller(runner)
+def _startup(runner, kind, fn):
+    controller = Controller(runner, kind)
     controller_available.fire(controller)
     if fn:
         fn(controller)
@@ -214,7 +221,7 @@ def _startup(runner, fn):
 def _controller_poll_runner(fn):
     kind = _wait_runner_kind()
     if kind in [RUNNER_LOCAL, RUNNER_MASTER]:
-        _startup(locust.runners.locust_runner, fn)
+        _startup(locust.runners.locust_runner, kind, fn)
     # else: Remove useless handler and abandon greenlet.
     events.hatch_complete -= on_hatch_complete
 
