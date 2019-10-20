@@ -12,4 +12,6 @@ class Connect(ZKLocust):
     task_set = ZKConnectTaskSet
 
     def __init__(self):
+        # Unlike other locust instances, this one must not "autostart"
+        # the ZK client.
         super(Connect, self).__init__(pseudo_root=None, autostart=False)
