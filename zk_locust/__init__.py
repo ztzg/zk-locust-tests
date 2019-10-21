@@ -101,14 +101,22 @@ class ZKLocust(Locust):
 
         if client_impl == 'kazoo':
             from .backend_kazoo import KazooLocustClient, KAZOO_EXCEPTIONS
-            self.client = KazooLocustClient(
-                hosts=hosts, pseudo_root=pseudo_root, **kwargs)
             register_exceptions(KAZOO_EXCEPTIONS)
+            try:
+                self.client = KazooLocustClient(
+                    hosts=hosts, pseudo_root=pseudo_root, **kwargs)
+            except KAZOO_EXCEPTIONS as e:
+                note_backend_exception(e, name='backend_kazoo')
+                raise  # Ignoring is not an option here
         elif client_impl == 'zkpython':
             from .backend_zkpython import ZKLocustClient, ZKPYTHON_EXCEPTIONS
-            self.client = ZKLocustClient(
-                hosts=hosts, pseudo_root=pseudo_root, **kwargs)
             register_exceptions(ZKPYTHON_EXCEPTIONS)
+            try:
+                self.client = ZKLocustClient(
+                    hosts=hosts, pseudo_root=pseudo_root, **kwargs)
+            except ZKPYTHON_EXCEPTIONS as e:
+                note_backend_exception(e, name='backend_zkpython')
+                raise  # Ignoring is not an option here
         else:
             raise ZKLocustException(
                 "Unknown value for 'client_impl': %s" % (client_impl))
