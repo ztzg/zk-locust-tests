@@ -1,8 +1,8 @@
 # A small "locustfile" which simulates Kazoo errors; shows the impact
 # of numerous failures on reported latency.
 #
-# Compare by setting `--timer-exception-behavior` to `ignore` or
-# `log_failure` in `parameterized-locust.sh`.
+# Compare by setting `--exception-behavior` to `log_failure` (default)
+# or `try_suppress` or in `parameterized-locust.sh`.
 
 import random
 
