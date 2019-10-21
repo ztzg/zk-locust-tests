@@ -1,5 +1,5 @@
-# An "heavy" and very experimental "locustfile" which seeks a "stable"
-# point of equilibrium while loading an ensemble.
+# An "heavy-hitting" Locust script which seeks a "stable" point of
+# equilibrium while loading an ensemble whose availability varies.
 #
 # An invocation such as this one:
 #
@@ -15,6 +15,9 @@
 #         --stats-collect 100 \
 #         --zk-metrics-collect 100 \
 #         --report-dir "$REPORT_DIR" \
+#         --bench-wait-disable-ms 5000 \
+#         --bench-wait-enable-ms 500 \
+#         --bench-wait-adjust-ms 4500 \
 #         --force \
 #         -- \
 #             --no-web \
@@ -22,15 +25,16 @@
 #             -f locust_max_load_seeker.py
 #
 # can generate "interesting" response curves such as the ones in
-# `doc/locust_max_load_binary_search.html`.  The "ZK Client Count"
-# plot shows an intense initial ramp-up of ZK Locust clients, followed
-# by a decrease as the error rate spikes.  The script then tries and
+# `doc/locust_max_load_binary_search.html` (produced using an
+# experimental version of this script).  The "ZK Client Count" plot
+# shows an intense initial ramp-up of ZK Locust clients, followed by a
+# decrease as the error rate spikes.  The script then tries and
 # continually adjusts the ramp-up/ramp-down rate.
 #
-# Note that this is an initial, mostly-untested proof-of-concept at
-# this point.  The analysis ought to be quite a bit smarter, and more
-# metrics should be considered (reasonable latencies, outstanding
-# requests, etc.).
+# Note that this is still a relatively early version of the benchmark;
+# the analysis ought to be quite a bit smarter, and more metrics
+# should be considered (reasonable latencies, outstanding requests,
+# etc.).
 
 import os
 import time
