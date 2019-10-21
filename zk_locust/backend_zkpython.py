@@ -112,4 +112,4 @@ class ZKLocustClient(AbstractZKLocustClient):
         return self.get_zk_client().create(path, flags=flags)
 
 
-ZKPYTHON_EXCEPTIONS = [ZKClientError]
+ZKPYTHON_EXCEPTIONS = (ZKClientError, )

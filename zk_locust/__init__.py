@@ -26,8 +26,10 @@ _default_exc_behavior = ExcBehavior[os.getenv(
     'ZK_LOCUST_EXCEPTION_BEHAVIOR',
     ExcBehavior.LOG_FAILURE.name).upper().replace('-', '_')]
 
-_backend_exceptions_dict = {}
+_backend_exceptions_set = set()
 _backend_exceptions = ()
+_backend_exceptions_non_suppress_set = set()
+_backend_exceptions_non_suppress = ()
 
 _zk_re_port = re.compile(r"(.*):(\d{1,4})$")
 
@@ -56,11 +58,14 @@ def split_zk_host_port(host_port):
         return (r[1], int(r[2]))
 
 
-def register_exceptions(exceptions):
-    global _backend_exceptions
-    for exception in exceptions:
-        _backend_exceptions_dict[exception] = True
-    _backend_exceptions = tuple(_backend_exceptions_dict.keys())
+def _add_backend_exceptions(exceptions, non_suppress=None):
+    global _backend_exceptions, _backend_exceptions_non_suppress
+    _backend_exceptions_set.update(exceptions)
+    _backend_exceptions = tuple(_backend_exceptions_set)
+    if non_suppress:
+        _backend_exceptions_non_suppress_set.update(non_suppress)
+        _backend_exceptions_non_suppress = tuple(
+            _backend_exceptions_non_suppress_set)
 
 
 def get_backend_exceptions():
@@ -81,8 +86,10 @@ def note_backend_exception(exc_instance,
             response_time=0,
             exception=exc_instance)
         handled = True
-    else:
-        handled = exc_behavior is ExcBehavior.TRY_SUPPRESS
+    elif exc_behavior is ExcBehavior.TRY_SUPPRESS:
+        can_suppress = isinstance(exc_instance,
+                                  _backend_exceptions_non_suppress)
+        handled = not can_suppress
 
     return handled
 
@@ -100,8 +107,9 @@ class ZKLocust(Locust):
         hosts = get_zk_hosts()
 
         if client_impl == 'kazoo':
-            from .backend_kazoo import KazooLocustClient, KAZOO_EXCEPTIONS
-            register_exceptions(KAZOO_EXCEPTIONS)
+            from .backend_kazoo import KazooLocustClient, KAZOO_EXCEPTIONS, KAZOO_NON_SUPPRESS_EXCEPTIONS
+            _add_backend_exceptions(KAZOO_EXCEPTIONS,
+                                    KAZOO_NON_SUPPRESS_EXCEPTIONS)
             try:
                 self.client = KazooLocustClient(
                     hosts=hosts, pseudo_root=pseudo_root, **kwargs)
@@ -110,7 +118,7 @@ class ZKLocust(Locust):
                 raise  # Ignoring is not an option here
         elif client_impl == 'zkpython':
             from .backend_zkpython import ZKLocustClient, ZKPYTHON_EXCEPTIONS
-            register_exceptions(ZKPYTHON_EXCEPTIONS)
+            _add_backend_exceptions(ZKPYTHON_EXCEPTIONS)
             try:
                 self.client = ZKLocustClient(
                     hosts=hosts, pseudo_root=pseudo_root, **kwargs)

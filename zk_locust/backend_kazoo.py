@@ -152,4 +152,5 @@ class KazooLocustClient(AbstractZKLocustClient):
         return client.create(path, ephemeral=True, sequence=True)
 
 
-KAZOO_EXCEPTIONS = [kazoo.exceptions.KazooException]
+KAZOO_EXCEPTIONS = (kazoo.exceptions.KazooException, )
+KAZOO_NON_SUPPRESS_EXCEPTIONS = (kazoo.exceptions.SessionExpiredError, )
