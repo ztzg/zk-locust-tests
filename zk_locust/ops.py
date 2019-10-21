@@ -9,7 +9,7 @@ from gevent import GreenletExit
 
 from locust import Locust, TaskSet, events
 
-from . import LocustTimer
+from . import LocustTimer, get_backend_exceptions, note_backend_exception
 
 _default_key_size = int(os.getenv('ZK_LOCUST_KEY_SIZE') or '8')
 _default_val_size = int(os.getenv('ZK_LOCUST_VAL_SIZE') or '8')
@@ -95,6 +95,9 @@ class AbstractOp(object):
         if ignore_connection_down is not None:
             self._ignore_connection_down = ignore_connection_down
 
+    def get_task_set_name(self):
+        return None
+
     def task(self, task_set):
         if task_set is not self._task_set:
             self._task_set = task_set
@@ -114,7 +117,11 @@ class AbstractOp(object):
             self._tick(task_set)
         if self._ignore_connection_down and self.client.is_connection_down():
             return
-        self.op()
+        try:
+            self.op()
+        except get_backend_exceptions() as e:
+            if not note_backend_exception(e, name=self.get_task_set_name()):
+                raise
 
 
 class AbstractSingleTimerOp(AbstractOp):
@@ -127,6 +134,9 @@ class AbstractSingleTimerOp(AbstractOp):
         super(AbstractSingleTimerOp, self).__init__(client, **kwargs)
         self._request_type = request_type
         self._task_set_name = task_set_name
+
+    def get_task_set_name(self):
+        return self._task_set_name
 
     def timing(self, request_type=None, task_set_name=None):
         return LocustTimer(
