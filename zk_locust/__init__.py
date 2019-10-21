@@ -2,6 +2,8 @@ import time
 import re
 import os
 
+from enum import Enum
+
 from locust import Locust, TaskSet, TaskSequence, events
 
 from .backend_base import ZKLocustException
@@ -12,6 +14,17 @@ PSEUDO_ROOT = os.getenv('ZK_LOCUST_PSEUDO_ROOT') or \
     os.getenv('KAZOO_LOCUST_PSEUDO_ROOT') or '/kl'
 MIN_WAIT = int(os.getenv('ZK_LOCUST_MIN_WAIT', '0'))
 MAX_WAIT = max(int(os.getenv('ZK_LOCUST_MAX_WAIT', '0')), MIN_WAIT)
+
+
+class ExcBehavior(Enum):
+    LOG_FAILURE = 0
+    IGNORE = 1
+    PROPAGATE = 2
+
+
+_default_exc_behavior = ExcBehavior[os.getenv(
+    'ZK_LOCUST_TIMER_EXCEPTION_BEHAVIOR',
+    ExcBehavior.LOG_FAILURE.name).upper()]
 
 _backend_exceptions_dict = {}
 _backend_exceptions = ()
@@ -105,14 +118,17 @@ class ZKLocustTaskSequence(TaskSequence):
 
 
 class LocustTimer(object):
-    _request_type = None
-    _name = None
     _start_time = None
     _is_reported = False
 
-    def __init__(self, request_type, name=''):
+    def __init__(self,
+                 request_type,
+                 name='',
+                 *,
+                 exc_behavior=_default_exc_behavior):
         self._request_type = request_type
         self._name = name
+        self._exc_behavior = exc_behavior
 
     def __enter__(self):
         self._start_time = time.time()
@@ -125,14 +141,22 @@ class LocustTimer(object):
             # letting the response code determine the outcome
             return exc is None
 
+        handled = False
+
         if exc:
             if isinstance(value, _backend_exceptions):
-                self.failure(value)
+                if self._exc_behavior is ExcBehavior.LOG_FAILURE:
+                    self.failure(value)
+                    handled = True
+                else:
+                    handled = self._exc_behavior is ExcBehavior.IGNORE
             else:
-                return False
+                handled = False
         else:
             self.success()
-        return True
+            handled = True
+
+        return handled
 
     def success(self, response_length=0):
         """

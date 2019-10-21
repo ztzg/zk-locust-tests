@@ -19,6 +19,8 @@ unset ZK_LOCUST_MAX_WAIT
 unset ZK_LOCUST_KEY_SIZE
 unset ZK_LOCUST_VAL_SIZE
 
+unset ZK_LOCUST_TIMER_EXCEPTION_BEHAVIOR
+
 unset KAZOO_LOCUST_HANDLER
 unset KAZOO_LOCUST_TIMEOUT_S
 unset KAZOO_LOCUST_SASL_OPTIONS
@@ -62,7 +64,7 @@ force=
 
 while [ -z "$dashdash" -a "$#" -gt '0' ]; do
     case "$1" in
-        --hosts|--client|--pseudo-root|--min-wait|--max-wait|--key-size|--val-size)
+        --hosts|--client|--pseudo-root|--min-wait|--max-wait|--key-size|--val-size|--timer-exception-behavior)
             set_var 'ZK_LOCUST_' "${1:2}" "$2"
             shift 2
             ;;
