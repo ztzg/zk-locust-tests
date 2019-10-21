@@ -17,6 +17,32 @@ _generation = 0
 
 _config_program = os.getenv('LOCUST_EXTRA_CONTROL_PROGRAM')
 
+_monkey_patch_hatching = int(
+    os.getenv('LOCUST_EXTRA_MONKEY_PATCH_HATCHING', '1')) != 0
+
+
+def _subst_hatching():
+    cls = locust.runners.LocustRunner
+    orig_start_hatching = cls.start_hatching
+
+    # KLUDGE: Locust 0.11.0 looks at the wrong property (num_clients
+    # instead of user_count) when computing the number of instances to
+    # spawn/kill!  We try compensating for it by monkey-patching a
+    # "fixed" start_hatching implementation.
+    def new_start_hatching(self, *args, **kwargs):
+        if (self.state != locust.runners.STATE_INIT
+                and self.state != locust.runners.STATE_STOPPED):
+            uc = self.user_count
+            dx = self.num_clients - uc
+            if dx:
+                _logger.warning('Correcting for num_clients drift (%r)', dx)
+                self.num_clients = uc
+
+        return orig_start_hatching(self, *args, **kwargs)
+
+    cls.start_hatching = new_start_hatching
+    _logger.info("Monkey-patched 'start_hatching' replacement into %r", cls)
+
 
 def on_hatch_complete(user_count):
     global _generation
@@ -83,15 +109,7 @@ class Controller(object):
         if hatch_rate is None:
             hatch_rate = runner.hatch_rate
 
-        # KLUDGE: Locust 0.11.0 looks at the wrong property
-        # (num_clients instead of user_count) when computing the
-        # number of instances to spawn/kill!  We try compensating for
-        # it here.
-        dx = runner.num_clients - runner.user_count
-        if dx:
-            _logger.warning('Correcting for num_client drift (%r)', dx)
-
-        runner.start_hatching(num_clients + dx, hatch_rate)
+        runner.start_hatching(num_clients, hatch_rate)
 
 
 class ProgrammedHandler(object):
@@ -229,6 +247,12 @@ def _startup(runner, kind, fn):
 
 def _controller_poll_runner(fn):
     kind = _wait_runner_kind()
+
+    global _monkey_patch_hatching
+    if _monkey_patch_hatching and kind in [RUNNER_LOCAL, RUNNER_SLAVE]:
+        _subst_hatching()
+        _monkey_patch_hatching = False
+
     if kind in [RUNNER_LOCAL, RUNNER_MASTER]:
         _startup(locust.runners.locust_runner, kind, fn)
     # else: Remove useless handler and abandon greenlet.
