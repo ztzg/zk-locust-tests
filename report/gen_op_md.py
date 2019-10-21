@@ -1133,7 +1133,7 @@ def process_task_set_op(base_input_path, task_set, op, data, op_path_prefix,
         groups[0].is_unique = True
 
     if nb_path:
-        if is_unique:
+        if is_unique and nb_path is not True:
             create_nb_single(groups[0].ls_df, task_set, op, nb_path,
                              op_path_prefix)
         else:
