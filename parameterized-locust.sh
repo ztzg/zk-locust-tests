@@ -64,7 +64,7 @@ force=
 
 while [ -z "$dashdash" -a "$#" -gt '0' ]; do
     case "$1" in
-        --hosts|--client|--pseudo-root|--min-wait|--max-wait|--key-size|--val-size|--timer-exception-behavior)
+        --hosts|--client|--pseudo-root|--min-wait|--max-wait|--key-size|--val-size|--exception-behavior)
             set_var 'ZK_LOCUST_' "${1:2}" "$2"
             shift 2
             ;;

@@ -18,13 +18,13 @@ MAX_WAIT = max(int(os.getenv('ZK_LOCUST_MAX_WAIT', '0')), MIN_WAIT)
 
 class ExcBehavior(Enum):
     LOG_FAILURE = 0
-    IGNORE = 1
+    TRY_SUPPRESS = 1
     PROPAGATE = 2
 
 
 _default_exc_behavior = ExcBehavior[os.getenv(
-    'ZK_LOCUST_TIMER_EXCEPTION_BEHAVIOR',
-    ExcBehavior.LOG_FAILURE.name).upper()]
+    'ZK_LOCUST_EXCEPTION_BEHAVIOR',
+    ExcBehavior.LOG_FAILURE.name).upper().replace('-', '_')]
 
 _backend_exceptions_dict = {}
 _backend_exceptions = ()
@@ -82,7 +82,7 @@ def note_backend_exception(exc_instance,
             exception=exc_instance)
         handled = True
     else:
-        handled = exc_behavior is ExcBehavior.IGNORE
+        handled = exc_behavior is ExcBehavior.TRY_SUPPRESS
 
     return handled
 
@@ -173,7 +173,7 @@ class LocustTimer(object):
                     self.failure(value)
                     handled = True
                 else:
-                    handled = self._exc_behavior is ExcBehavior.IGNORE
+                    handled = self._exc_behavior is ExcBehavior.TRY_SUPPRESS
             else:
                 handled = False
         else:
