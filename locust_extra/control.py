@@ -82,7 +82,16 @@ class Controller(object):
             num_clients = runner.num_clients
         if hatch_rate is None:
             hatch_rate = runner.hatch_rate
-        runner.start_hatching(num_clients, hatch_rate)
+
+        # KLUDGE: Locust 0.11.0 looks at the wrong property
+        # (num_clients instead of user_count) when computing the
+        # number of instances to spawn/kill!  We try compensating for
+        # it here.
+        dx = runner.num_clients - runner.user_count
+        if dx:
+            _logger.warning('Correcting for num_client drift (%r)', dx)
+
+        runner.start_hatching(num_clients + dx, hatch_rate)
 
 
 class ProgrammedHandler(object):

@@ -187,14 +187,8 @@ def _locust_clients_manager(controller):
                 'act_clients=%r, num_clients=%r', num_clients - act_clients,
                 derr, dt, f, act_clients, num_clients)
 
-            # KLUDGE: Locust 0.11.0 looks at the wrong property
-            # (num_clients instead of user_count) when computing the
-            # number of instances to spawn/kill!  We try compensating
-            # for it here.
-            dx = controller.get_num_clients() - controller.get_user_count()
-
             controller.start_hatching(
-                num_clients=num_clients + dx, hatch_rate=num_clients)
+                num_clients=num_clients, hatch_rate=num_clients)
 
             if num_clients > act_clients:
                 # Wait for new "generation."
