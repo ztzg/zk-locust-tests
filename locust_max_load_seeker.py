@@ -128,13 +128,15 @@ def _locust_clients_manager(controller):
     num_workers = controller.get_num_workers()
     exp_clients = controller.get_user_count()
 
-    base_f = 4
+    base_f = 2
     f = base_f
 
     max_new_clients = num_workers * 64
 
+    sleep_ms = 5000
+
     while True:
-        controller.sleep_ms(5000)
+        controller.sleep_ms(sleep_ms)
 
         # Send "continue" token
         _clients_queue.put(True)
@@ -142,7 +144,9 @@ def _locust_clients_manager(controller):
         # Wait for "continue" signal
         _ensemble_queue.get()
 
-        controller.sleep_ms(5000)
+        controller.sleep_ms(sleep_ms)
+
+        sleep_ms += 100
 
         # Note: We have to look at the actual running count, which is
         # "published" at the same time as statistics--so we wait for
@@ -169,7 +173,7 @@ def _locust_clients_manager(controller):
 
         if is_failing:
             # Reduce rate, so that we won't come back so fast
-            base_f = max(base_f / 4, 1 + 1 / max_new_clients)
+            base_f = max(base_f * 3 / 4, 1 + 1 / max_new_clients)
             # And back off
             f = max(1 / base_f, 3 / 4)
         elif derr == 0:
