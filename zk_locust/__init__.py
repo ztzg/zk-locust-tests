@@ -63,6 +63,30 @@ def register_exceptions(exceptions):
     _backend_exceptions = tuple(_backend_exceptions_dict.keys())
 
 
+def get_backend_exceptions():
+    return _backend_exceptions
+
+
+def note_backend_exception(exc_instance,
+                           *,
+                           request_type=None,
+                           name=None,
+                           exc_behavior=_default_exc_behavior):
+    handled = False
+
+    if exc_behavior is ExcBehavior.LOG_FAILURE:
+        events.request_failure.fire(
+            request_type=request_type or 'unknown',
+            name=name or 'unknown',
+            response_time=0,
+            exception=exc_instance)
+        handled = True
+    else:
+        handled = exc_behavior is ExcBehavior.IGNORE
+
+    return handled
+
+
 class ZKLocust(Locust):
     min_wait = MIN_WAIT
     max_wait = MAX_WAIT
