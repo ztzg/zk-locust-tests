@@ -182,7 +182,7 @@ def _locust_clients_manager(controller):
         num_clients = max(num_clients, num_workers)
 
         if num_clients != act_clients:
-            _logger.debug(
+            _logger.info(
                 'Adjusting client count (%r); derr=%r, dt=%gs, f=%r, '
                 'act_clients=%r, num_clients=%r', num_clients - act_clients,
                 derr, dt, f, act_clients, num_clients)
