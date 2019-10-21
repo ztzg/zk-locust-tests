@@ -50,6 +50,8 @@ from zk_metrics import register_zk_metrics
 from zk_locust.task_sets import ZKSetTaskSet
 from zk_dispatch import register_dispatcher
 
+_modify_ensemble = int(os.getenv('ZK_LOCUST_BENCH_MODIFY_ENSEMBLE', '1')) != 0
+
 _disable_ms = int(os.getenv('ZK_LOCUST_BENCH_WAIT_DISABLE_MS', '3000'))
 _enable_ms = int(os.getenv('ZK_LOCUST_BENCH_WAIT_ENABLE_MS', '250'))
 _adjust_ms = int(os.getenv('ZK_LOCUST_BENCH_WAIT_ADJUST_MS', '3000'))
@@ -88,7 +90,8 @@ def _zk_ensemble_manager(controller, members, **kwargs):
         _ensemble_queue.put(True)
 
 
-register_dispatcher(fn=_zk_ensemble_manager)
+if _modify_ensemble:
+    register_dispatcher(fn=_zk_ensemble_manager)
 
 
 def _count_errors(errors_map):
@@ -149,11 +152,11 @@ def _locust_clients_manager(controller):
     while True:
         controller.sleep_ms(_disable_ms)
 
-        # Send "continue" token
-        _clients_queue.put(True)
-
-        # Wait for "continue" signal
-        _ensemble_queue.get()
+        if _modify_ensemble:
+            # Send "continue" token
+            _clients_queue.put(True)
+            # Wait for "continue" signal
+            _ensemble_queue.get()
 
         controller.sleep_ms(_adjust_ms)
 
