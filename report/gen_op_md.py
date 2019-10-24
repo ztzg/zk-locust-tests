@@ -1143,7 +1143,7 @@ def process_task_set_op(base_input_path, task_set, op, data, op_path_prefix,
             create_nb_multi(base_input_path, task_set, op, data, nb_path)
 
     if md_path:
-        if is_unique:
+        if is_unique and nb_path is not True:
             process_task_set_op_single(task_set, op, groups[0], op_path_prefix,
                                        md_path, options)
         else:
