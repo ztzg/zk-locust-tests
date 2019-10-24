@@ -11,6 +11,7 @@ import warnings
 import re
 import io
 import json
+import pprint
 
 import distutils.util
 
@@ -30,6 +31,8 @@ _figsize = plt.rcParams["figure.figsize"]
 logging.basicConfig()
 _logger = logging.getLogger(__name__)
 # _logger.setLevel(logging.DEBUG)
+
+_pprint_subst = re.compile(r"^([^ ]+) = {}.*# pprint$")
 
 warnings.filterwarnings('ignore', 'The handle <matplotlib')
 
@@ -275,6 +278,13 @@ def load_exec_nb_template(path, mapping):
             acc.append(line[1:])
         elif state == 'code' and not line.startswith('#'):
             acc.append(line)
+        elif _pprint_subst.match(line):
+            if state == 'md':
+                flush()
+                state = 'code'
+            key = _pprint_subst.match(line)[1]
+            v = mapping[key]
+            acc.append(key + ' = ' + pprint.pformat(v, indent=4))
         elif line.startswith('# '):
             if state != 'md':
                 flush()
@@ -296,7 +306,7 @@ def load_exec_nb_template(path, mapping):
     return nb
 
 
-def create_nb_single(df, task_set, op, nb_path, op_path_prefix):
+def create_nb_single(df, task_set, op, options, nb_path, op_path_prefix):
     nb_dir = os.path.dirname(nb_path)
 
     def nb_relpath(path):
@@ -306,6 +316,10 @@ def create_nb_single(df, task_set, op, nb_path, op_path_prefix):
     mapping = {
         'md_task_set': _md_escape(task_set),
         'md_op': _md_escape(op),
+        'plot_options': options or {
+            '*.height': 8,
+            'client_count.per_worker': False,
+        },
         'pys_ls_df_csv': nb_relpath(op_path_prefix + '.ls_subset.csv'),
         'pys_zkm_df_csv': nb_relpath(op_path_prefix + '.zkm_subset.csv')
     }
@@ -317,7 +331,8 @@ def create_nb_single(df, task_set, op, nb_path, op_path_prefix):
     nbf.write(nb, nb_path)
 
 
-def create_nb_multi(base_input_path, task_set, op, groups_data, nb_path):
+def create_nb_multi(base_input_path, task_set, op, groups_data, options,
+                    nb_path):
     nb_dir = os.path.dirname(nb_path)
 
     def nb_relpath(path):
@@ -332,7 +347,11 @@ def create_nb_multi(base_input_path, task_set, op, groups_data, nb_path):
     mapping = {
         'md_task_set': _md_escape(task_set),
         'md_op': _md_escape(op),
-        'py_groups_data_json': json.dumps(groups_data, indent=4)
+        'plot_options': options or {
+            '*.height': 8,
+            '*.shade': False
+        },
+        'groups_data': groups_data
     }
 
     nb = load_exec_nb_template(
@@ -1130,13 +1149,14 @@ def process_task_set_op(base_input_path, task_set, op, data, op_path_prefix,
 
     if nb_path:
         if is_unique and nb_path is not True:
-            create_nb_single(groups[0].ls_df, task_set, op, nb_path,
+            create_nb_single(groups[0].ls_df, task_set, op, options, nb_path,
                              op_path_prefix)
         else:
             if nb_path is True:
                 nb_path = op_path_prefix + '.fragment.ipynb'
 
-            create_nb_multi(base_input_path, task_set, op, data, nb_path)
+            create_nb_multi(base_input_path, task_set, op, data, options,
+                            nb_path)
 
     if md_path:
         if is_unique and nb_path is not True:

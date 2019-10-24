@@ -9,15 +9,12 @@ from report import gen_op_md
 
 # # General setup
 
-plot_options = {'*.height': 8, '*.shade': False}
+plot_options = {}  # pprint
 
 # # Task set '${md_task_set}', op '${md_op}'
 
-groups_data_json = """
-${py_groups_data_json}
-"""
+groups_data = {}  # pprint
 
-groups_data = json.loads(groups_data_json)
 groups = [gen_op_md.load_group('.', group_data) for group_data in groups_data]
 
 # ## Latencies

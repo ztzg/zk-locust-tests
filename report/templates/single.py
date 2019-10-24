@@ -8,10 +8,7 @@ from report import gen_op_md
 
 # # General setup
 
-plot_options = {
-    '*.height': 8,
-    'client_count.per_worker': False,
-}
+plot_options = {}  # pprint
 
 # # Task set '${md_task_set}', op '${md_op}'
 
