@@ -1083,10 +1083,6 @@ def process_task_set_op_single(task_set, op, group, op_path_prefix, md_path,
              client_count_fig_infos, request_frequency_fig_infos,
              errors_fig_infos, zkm_fig_infos)
 
-    nb_path = re.sub(r'\.md.*', '.ipynb', md_path)
-
-    create_nb_single(ls_df, task_set, op, nb_path, op_path_prefix)
-
 
 def process_task_set_op_multi(task_set, op, groups, op_path_prefix, md_path,
                               options):
