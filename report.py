@@ -6,6 +6,8 @@ import os.path
 import subprocess
 import json
 
+import shutil
+
 import click
 
 _base = os.path.dirname(os.path.realpath(__file__))
@@ -15,6 +17,10 @@ sys.path.append(_report_scripts)
 
 if True:
     import gen_op_md
+
+
+def _has_pandoc():
+    return shutil.which("pandoc") is not None
 
 
 @click.command()
@@ -41,12 +47,22 @@ if True:
     help="Set named report or plot option")
 @click.option(
     "--md/--no-md", default=True, help="Generate Markdown-based report")
+@click.option(
+    "--pdf/--no-pdf",
+    default=_has_pandoc,
+    show_default='if Pandoc available',
+    help="Generate PDF from Markdown report")
+@click.option(
+    "--html/--no-html",
+    default=_has_pandoc,
+    show_default='if Pandoc available',
+    help="Generate HTML from Markdown report")
 @click.option("--nb/--no-nb", default=False, help="Generate Jupyter notebook")
 @click.option("-f", "--force", is_flag=True, help="Possibly overwrite files")
 @click.option("-j", "--jobs", type=click.INT, help="Use parallel jobs")
 @click.option('-v', '--verbose', count=True)
 def cli(metrics_dir, labeled_metrics_dir, zk_metrics_csv, stats_csv,
-        report_dir, option, in_place, md, nb, force, jobs, verbose):
+        report_dir, option, in_place, md, pdf, html, nb, force, jobs, verbose):
     if metrics_dir and labeled_metrics_dir:
         raise click.ClickException(
             '--metrics-dir and --labeled-metrics-dir cannot be used together.')
@@ -119,8 +135,9 @@ def cli(metrics_dir, labeled_metrics_dir, zk_metrics_csv, stats_csv,
         extra_args = [
             'LOCUST_EXTRA_STATS_CSV=' + os.path.abspath(stats_csvs[0]),
             'ZK_LOCUST_ZK_METRICS_CSV=' + os.path.abspath(zk_metrics_csvs[0]),
-            'GEN_MD=' + ('1' if md else ''), 'GEN_NB=' + ('1' if nb else ''),
-            'report'
+            'GEN_MD=' + ('1' if md else ''), 'GEN_PDF=' + ('1' if pdf else ''),
+            'GEN_HTML=' + ('1' if html else ''),
+            'GEN_NB=' + ('1' if nb else ''), 'report'
         ]
         os.execvp(make_args[0], make_args + extra_args)
         return  # But execvp should have taken over.
@@ -154,6 +171,10 @@ def cli(metrics_dir, labeled_metrics_dir, zk_metrics_csv, stats_csv,
             fragments.append(fragment)
 
     top_frags_dir = os.path.join(report_dir, 'fragments')
+
+    # TODO: This passes md and nb as flag--and does not pass html/pdf
+    # at all because that portion of the pipeline has not been
+    # implemented yet.
     gen_op_md.process_fragments(report_dir, fragments, top_frags_dir, 'mix',
                                 md, nb, options)
 
