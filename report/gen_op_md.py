@@ -403,24 +403,10 @@ def set_ax_labels(ax, *, x_is_relative=False, y_label=None):
         ax.set_ylabel(y_label)
 
 
-def ysync_axes_widen(axes):
-    for ax in axes:
-        if ax is axes[0]:
-            bottom, top = ax.get_ylim()
-        else:
-            axes[0].get_shared_x_axes().join(axes[0], ax)
-
-            bottom_k, top_k = ax.get_ylim()
-            bottom = min(bottom, bottom_k)
-            top = max(top, top_k)
-
-    for ax in axes:
-        ax.set_ylim(bottom=bottom, top=top)
-
-
 class AbstractPlotter(metaclass=ABCMeta):
     def __init__(self, get_option=None):
         self._figsize = _figsize
+        self._ylim = (None, None)
         if get_option:
             w = get_option('width', type=float)
             if w and w > 0:
@@ -428,18 +414,49 @@ class AbstractPlotter(metaclass=ABCMeta):
             h = get_option('height', type=float)
             if h and h > 0:
                 self._figsize = (self._figsize[0], h)
+            bottom = get_option('bottom', type=float)
+            if bottom is not None:
+                self._ylim = (bottom, self._ylim[1])
+            top = get_option('top', type=float)
+            if top is not None:
+                self._ylim = (self._ylim[0], top)
 
     def fig(self):
         fig = plt.figure(figsize=self._figsize)
+        ax = fig.gca()
 
-        return (fig, fig.gca())
+        return (fig, ax)
 
     def vsubplots(self, nrows):
         if self._figsize is _figsize:
             figsize = (_figsize[0], _figsize[1] / 3 * nrows)
         else:
             figsize = self._figsize
+
         return plt.subplots(nrows=nrows, figsize=figsize)
+
+    def limit_axes(self, axes):
+        for ax in axes:
+            ax.set_ylim(self._ylim)
+
+    def ysync_axes(self, axes):
+        for ax in axes:
+            if ax is axes[0]:
+                bottom, top = ax.get_ylim()
+            else:
+                axes[0].get_shared_x_axes().join(axes[0], ax)
+
+                bottom_k, top_k = ax.get_ylim()
+                bottom = min(bottom, bottom_k)
+                top = max(top, top_k)
+
+        if self._ylim[0] is not None:
+            bottom = self._ylim[0]
+        if self._ylim[1] is not None:
+            top = self._ylim[1]
+
+        for ax in axes:
+            ax.set_ylim(bottom=bottom, top=top)
 
     @abstractmethod
     def plot(self, groups):
@@ -515,6 +532,7 @@ class LatenciesPlotter(AbstractPlotter):
                     ax=ax,
                     label=group.prefix_label(pc))
 
+        self.limit_axes([ax])
         set_ax_labels(ax, x_is_relative=is_relative, y_label='Latency (ms)')
 
         return [FigInfo(fig, title)]
@@ -590,6 +608,7 @@ class ClientCountPlotter(AbstractPlotter):
         else:
             ax.get_legend().set_visible(False)
 
+        self.limit_axes([ax])
         set_ax_labels(ax, x_is_relative=is_relative, y_label='Count')
 
         return [FigInfo(fig, title)]
@@ -696,7 +715,8 @@ class RequestFrequencyPlotter(AbstractPlotter):
 
         fig.subplots_adjust(bottom=0.2)
 
-        ysync_axes_widen([req_ax, succ_ax])
+        self.ysync_axes([req_ax, succ_ax])
+        self.limit_axes([fail_ax])
         req_ax.get_shared_x_axes().join(req_ax, fail_ax)
 
         return [FigInfo(fig, title)]
@@ -898,7 +918,7 @@ class ZooKeeperMetricsPlotter(AbstractPlotter):
                 set_ax_labels(ax, x_is_relative=is_relative, y_label=ylabel)
                 ax.set_xlabel(host_port + ', ' + ax.get_xlabel())
 
-        ysync_axes_widen(axes)
+        self.ysync_axes(axes)
 
         return [FigInfo(fig, title)]
 
@@ -1056,6 +1076,7 @@ class ErrorsPlotter(AbstractPlotter):
             if labels:
                 ax.legend(labels)
 
+            self.limit_axes([ax])
             set_ax_labels(ax, x_is_relative=is_relative, y_label='Count')
 
             a, b = ax.get_ylim()

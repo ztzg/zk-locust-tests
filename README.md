@@ -323,6 +323,10 @@ categories):
   * `*.width`, `*.height`: The (floating-point) width/(resp.)height of
     a plot in Matplotlib units (normally inches);
 
+  * `*.bottom`, `*.top`: (Floating-point) "anchors" for the Y axis,
+    propagated to Matplotlib via `set_ylim`.  Both default to `None`,
+    which means "auto";
+
   * `*.per_worker`: A boolean indicating whether to include a
     "distribution" of per-worker (Locust "slave") curves on relevant
     plots (default: `True`);
