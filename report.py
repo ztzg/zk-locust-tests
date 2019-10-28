@@ -103,12 +103,8 @@ def cli(metrics_dir, labeled_metrics_dir, zk_metrics_csv, stats_csv,
     report_mk = os.path.join(_report_scripts, 'report.mk')
 
     make_args = [
-        'make',
-        '--no-print-directory',
-        '-C',
-        report_dir,
-        '-f',
-        report_mk,
+        'make', '--no-print-directory', '-C', report_dir, '-f', report_mk,
+        '--keep-going'
     ]
 
     if jobs:
