@@ -130,6 +130,12 @@ def cli(metrics_dir, labeled_metrics_dir, zk_metrics_csv, stats_csv,
 
     os.makedirs(report_dir, exist_ok=True)
 
+    if options:
+        options_json = os.path.join(report_dir, 'options.json')
+        with open(options_json, 'w') as f:
+            json.dump(options, f)
+        make_args.append('OPTIONS_JSON=' + os.path.abspath(options_json))
+
     # Single-dataset reports can be done in one shot.
     if not is_multi:
         extra_args = [
