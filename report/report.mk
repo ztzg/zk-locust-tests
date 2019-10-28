@@ -7,6 +7,8 @@ FRAGS_DIR = fragments
 FRAGS_ID =
 
 GEN_MD = 1
+GEN_HTML = $(GEN_MD)
+GEN_PDF = $(GEN_MD)
 GEN_NB =
 
 $(V).SILENT:
@@ -22,7 +24,10 @@ TASK_SET_FRAG_IPYNBS = \
 TASK_SET_MDS = \
 	$(addprefix $(FRAGS_DIR)/,$(addsuffix /task_set.md,$(TASK_SETS)))
 
-MD_TARGETS = $(if $(GEN_MD),report.html report.pdf)
+MD_TARGETS = $(if $(GEN_MD),report.md \
+	$(if $(GEN_HTML),report.html) \
+	$(if $(GEN_PDF),report.pdf))
+
 NB_TARGETS = $(if $(GEN_NB),$(TASK_SET_FRAG_IPYNBS))
 
 .PHONY: report
