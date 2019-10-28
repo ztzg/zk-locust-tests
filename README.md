@@ -259,8 +259,11 @@ systematically clears the latter when the flag argument is known.)
 ### Reporting Parameters
 
 The `parameterized-locust.sh` script can be directed to generate a
-report when the locust runner exists.  Here are some reporting
-parameters:
+report after the locust runner exists.  (Alternatively, reports can be
+"manually" generated at any time after completion using the reporting
+script, see "Reporting Parameters for `report.py`" below.)
+
+Here are some reporting parameters it admits:
 
   * `--report-dir`: The name of a directory to use to store the
     collected metrics and generate a "human-readable" report;
@@ -286,19 +289,24 @@ one or more existing datasets.  Here are some of its parameters (run
 
   * `--md`/`--no-md`: Generate Markdown-based report;
   * `--nb`/`--no-nb`: Generate Jupyter notebook;
-  * `--option <key value>`: Set named report or plot option (see
-    below).
+  * `--option <key value>`: Set a single "named" report or plot option
+    (see below).
 
-Named report or plot options are passed via `--option`, which can be
-specified a number of times.  E.g.:
+"Named" report/plot options are passed via the `--option` flag, which
+can be specified a number of times.  E.g.:
 
     ./report.py ... \
          --option latencies.shade False \
          --option '*.width' 10 ...
 
-The keys themselves are made of two parts, "category" and "option,"
-separated by a dot.  `*` can be used as a wildcard for all categories.
-The categories are:
+With Mardown-based reports, such options are "statically" applied at
+report generation time.  When generating Jupyter notebooks, they just
+replace the default `plot_options` stanza in "General setup," and can
+later be interactively tweaked.
+
+The "naming" keys themselves are made of two parts, "category" and
+"option," separated by a dot.  `*` can be used as a wildcard matching
+all categories.  The categories are:
 
   * `latencies`: "Operation Latencies" plot;
   * `client_count`: "ZK Client Count" plot;
@@ -309,7 +317,8 @@ The categories are:
   * `watch_count`: "ZooKeeper Watches" plot;
   * `errors`: All "Errors" plots.
 
-Common plot options are (`*` means: valid for many categories):
+Common plot options are (`*` means: valid for all applicable
+categories):
 
   * `*.width`, `*.height`: The (floating-point) width/(resp.)height of
     a plot in Matplotlib units (normally inches);
@@ -323,8 +332,8 @@ Common plot options are (`*` means: valid for many categories):
 
 ## "Locustfiles" Starter Kit
 
-The `locust_*.py` files are "locustfiles," and test various aspects of
-the target ZooKeeper ensemble.
+The included `locust_*.py` files are "locustfiles," and test various
+aspects of the target ZooKeeper ensemble.
 
 Most are composed of boilerplate code, and use "operations" and "task
 sets" which have been factored out to the `zk_locust.ops` and
