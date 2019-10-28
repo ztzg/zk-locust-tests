@@ -10,7 +10,6 @@ import json
 import warnings
 import re
 import io
-import json
 import pprint
 
 import distutils.util
@@ -1186,12 +1185,17 @@ def process_fragments(base_input_path, fragments, output_base, subtree_root,
                             op_path_prefix, md_path, nb_path, options)
 
 
-def main(executable, metadata, output_base, md_path, nb_path):
+def main(executable, metadata, options_json, output_base, md_path, nb_path):
+    if options_json:
+        with open(options_json) as f:
+            options = json.load(f)
+    else:
+        options = {}
+
     with open(metadata) as f:
         lines = f.readlines()
 
     fragments = [json.loads(line) for line in lines]
-    options = {}
 
     process_fragments('.', fragments, output_base, None, md_path, nb_path,
                       options)

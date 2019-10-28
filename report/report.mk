@@ -11,6 +11,8 @@ GEN_HTML = $(GEN_MD)
 GEN_PDF = $(GEN_MD)
 GEN_NB =
 
+OPTIONS_JSON =
+
 $(V).SILENT:
 
 -include $(FRAGS_DIR)/subsets.mk
@@ -94,11 +96,13 @@ $(FRAGS_DIR)/fragments.jsonl:			\
 .PRECIOUS: %.fragment.md
 %.fragment.md:					\
 		%.fragment.jsonl		\
-		$(SCRIPT_DIR)/gen_op_md.py
+		$(SCRIPT_DIR)/gen_op_md.py	\
+		$(OPTIONS_JSON)
 	@echo '  FRAGMENT $* Markdown'
 	@mkdir -p $(dir $@)
 	$(SCRIPT_DIR)/gen_op_md.py		\
 	    $<					\
+	    '$(OPTIONS_JSON)'			\
 	    $(patsubst %.fragment.md,%,$@)	\
 	    $@.tmp				\
 	    ''
@@ -107,11 +111,13 @@ $(FRAGS_DIR)/fragments.jsonl:			\
 .PRECIOUS: %.fragment.ipynb
 %.fragment.ipynb:				\
 		%.fragment.jsonl		\
-		$(SCRIPT_DIR)/gen_op_md.py
+		$(SCRIPT_DIR)/gen_op_md.py	\
+		$(OPTIONS_JSON)
 	@echo '  FRAGMENT $* Jupyter .ipynb'
 	@mkdir -p $(dir $@)
 	$(SCRIPT_DIR)/gen_op_md.py		\
 	    $<					\
+	    '$(OPTIONS_JSON)'			\
 	    $(patsubst %.fragment.ipynb,%,$@)	\
 	    ''					\
 	    $@.tmp
