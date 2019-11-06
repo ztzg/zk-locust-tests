@@ -103,7 +103,7 @@ class ZKLocustClient(AbstractZKLocustClient):
         self.get_zk_client().close()
 
     def is_connection_down(self):
-        return True
+        return False
 
     def create_default_node(self):
         path = self.join_path('/d-')
