@@ -36,6 +36,8 @@
 # should be considered (reasonable latencies, outstanding requests,
 # etc.).
 
+import math
+import collections
 import os
 import time
 import logging
@@ -86,6 +88,46 @@ _hatch_complete_event = gevent.event.Event()
 
 _errors_pair = None
 _errors_lock = gevent.thread.LockType()
+
+
+class IrregularSeries(object):
+    def __init__(self):
+        self._raw = []
+        self._base = None
+        self._interp = []
+
+    def record(self, at, sample):
+        z = len(self._raw)
+        if z == 0:
+            # Initial sample
+            self._raw.append((at, sample))
+            self._base = int(math.ceil(at))
+        else:
+            prev_at, prev_value = self._raw[z - 1]
+
+            # Cumsum
+            value = prev_value + sample
+            self._raw.append((at, value))
+
+            # Interp
+            r_at = at - self._base
+            r_prev_at = prev_at - self._base
+            t0 = int(math.ceil(r_prev_at))
+            t1 = int(math.floor(r_at))
+            if t1 == int(math.ceil(r_at)):
+                t1 -= 1
+            dt = r_at - r_prev_at
+            for t in range(t0, t1 + 1):
+                f = (t - r_prev_at) / dt
+                iv = prev_value * (1 - f) + value * f
+                self._interp.append(iv)
+
+    def get_interp(self):
+        return (self._base, self._interp)
+
+
+_stats_info = collections.defaultdict(IrregularSeries)
+_stats_lock = gevent.thread.LockType()
 
 
 def _zk_ensemble_manager(controller, members, **kwargs):
@@ -233,21 +275,20 @@ def _locust_clients_manager(controller):
 register_controller(fn=_locust_clients_manager)
 
 
-def _locust_stats_handler(*, worker_id, errors, **kwargs):
-    # Ignore per-worker details for now.
-    if worker_id:
-        return
-
-    if not errors:
-        return
-
+def _locust_stats_handler(*, worker_id, stats, errors, **kwargs):
     at = time.time()
 
-    with _errors_lock:
-        global _errors_pair
-        _errors_pair = (at, errors)
-
-    # _logger.debug('Stats updated')
+    if worker_id:
+        # Handle stats on a per-worker basis.
+        with _stats_lock:
+            key = (worker_id, stats.name, stats.method)
+            series = _stats_info[key]
+            series.record(at, stats.num_requests)
+    elif errors:
+        # Handle errors globally.
+        with _errors_lock:
+            global _errors_pair
+            _errors_pair = (at, errors)
 
 
 register_extra_stats(fn=_locust_stats_handler)
