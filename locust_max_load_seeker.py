@@ -60,6 +60,9 @@ _disable_ms = int(os.getenv('ZK_LOCUST_BENCH_WAIT_DISABLE_MS', '3000'))
 _enable_ms = int(os.getenv('ZK_LOCUST_BENCH_WAIT_ENABLE_MS', '250'))
 _adjust_ms = int(os.getenv('ZK_LOCUST_BENCH_WAIT_ADJUST_MS', '3000'))
 
+_hatch_rate = float(os.getenv('ZK_LOCUST_BENCH_HATCH_RATE', '0'))
+_hatch_duration_s = float(os.getenv('ZK_LOCUST_BENCH_HATCH_DURATION_S', '0'))
+
 _op_set = int(os.getenv('ZK_LOCUST_BENCH_OP_SET', '1')) != 0
 _op_get = int(os.getenv('ZK_LOCUST_BENCH_OP_GET', '1')) != 0
 _op_connect = int(os.getenv('ZK_LOCUST_BENCH_OP_CONNECT', '1')) != 0
@@ -200,16 +203,23 @@ def _locust_clients_manager(controller):
             num_clients = max(num_clients, num_workers)
 
             if num_clients != act_clients:
+                if _hatch_rate > 0:
+                    hatch_rate = _hatch_rate
+                elif _hatch_duration_s > 0:
+                    hatch_rate = (num_clients - act_clients) / _hatch_duration_s
+                else:
+                    hatch_rate = max(num_clients, 128)
+
                 _logger.info(
                     'Adjusting client count (%+d); derr=%r, dt=%gs, f=%r, '
-                    'act_clients=%r, num_clients=%r',
+                    'act_clients=%r, num_clients=%r, hatch_rate=%r',
                     num_clients - act_clients, derr, dt, f, act_clients,
-                    num_clients)
+                    num_clients, hatch_rate)
 
                 _hatch_complete_event.clear()
 
                 controller.start_hatching(
-                    num_clients=num_clients, hatch_rate=num_clients)
+                    num_clients=num_clients, hatch_rate=hatch_rate)
 
                 # Wait for new "generation."  KLUDGE: Mostly.  Locust
                 # 0.11.0 is broken and often sends multiple
