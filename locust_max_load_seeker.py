@@ -200,34 +200,34 @@ def _locust_clients_manager(controller):
         if not has_dead_clients:
             num_clients = int(act_clients * f)
             num_clients = min(num_clients, act_clients + max_new_clients)
-            num_clients = max(num_clients, num_workers)
+            # At least one new client per worker.
+            num_clients = max(num_clients, act_clients + num_workers)
 
-            if num_clients != act_clients:
-                if _hatch_rate > 0:
-                    hatch_rate = _hatch_rate
-                elif _hatch_duration_s > 0:
-                    hatch_rate = (num_clients - act_clients) / _hatch_duration_s
-                else:
-                    hatch_rate = max(num_clients, 128)
+            if _hatch_rate > 0:
+                hatch_rate = _hatch_rate
+            elif _hatch_duration_s > 0:
+                hatch_rate = (num_clients - act_clients) / _hatch_duration_s
+            else:
+                hatch_rate = max(num_clients, 128)
 
-                _logger.info(
-                    'Adjusting client count (%+d); derr=%r, dt=%gs, f=%r, '
-                    'act_clients=%r, num_clients=%r, hatch_rate=%r',
-                    num_clients - act_clients, derr, dt, f, act_clients,
-                    num_clients, hatch_rate)
+            _logger.info(
+                'Adjusting client count (%+d); derr=%r, dt=%gs, f=%r, '
+                'act_clients=%r, num_clients=%r, hatch_rate=%r',
+                num_clients - act_clients, derr, dt, f, act_clients,
+                num_clients, hatch_rate)
 
-                _hatch_complete_event.clear()
+            _hatch_complete_event.clear()
 
-                controller.start_hatching(
-                    num_clients=num_clients, hatch_rate=hatch_rate)
+            controller.start_hatching(
+                num_clients=num_clients, hatch_rate=hatch_rate)
 
-                # Wait for new "generation."  KLUDGE: Mostly.  Locust
-                # 0.11.0 is broken and often sends multiple
-                # "hatch_complete" notifications.  The next step is a
-                # "big" sleep, so let's hope that will compensate.
-                _hatch_complete_event.wait()
+            # Wait for new "generation."  KLUDGE: Mostly.  Locust
+            # 0.11.0 is broken and often sends multiple
+            # "hatch_complete" notifications.  The next step is a
+            # "big" sleep, so let's hope that will compensate.
+            _hatch_complete_event.wait()
 
-                exp_clients = num_clients
+            exp_clients = num_clients
 
 
 register_controller(fn=_locust_clients_manager)
