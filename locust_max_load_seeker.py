@@ -51,7 +51,7 @@ from locust_extra.stats import register_extra_stats
 from locust_extra.control import register_controller
 from zk_metrics import register_zk_metrics
 
-from zk_locust.task_sets import ZKSetTaskSet
+from zk_locust.task_sets import ZKGetTaskSet, ZKSetTaskSet, ZKConnectTaskSet
 from zk_dispatch import register_dispatcher
 
 _modify_ensemble = int(os.getenv('ZK_LOCUST_BENCH_MODIFY_ENSEMBLE', '1')) != 0
@@ -59,6 +59,10 @@ _modify_ensemble = int(os.getenv('ZK_LOCUST_BENCH_MODIFY_ENSEMBLE', '1')) != 0
 _disable_ms = int(os.getenv('ZK_LOCUST_BENCH_WAIT_DISABLE_MS', '3000'))
 _enable_ms = int(os.getenv('ZK_LOCUST_BENCH_WAIT_ENABLE_MS', '250'))
 _adjust_ms = int(os.getenv('ZK_LOCUST_BENCH_WAIT_ADJUST_MS', '3000'))
+
+_op_set = int(os.getenv('ZK_LOCUST_BENCH_OP_SET', '1')) != 0
+_op_get = int(os.getenv('ZK_LOCUST_BENCH_OP_GET', '1')) != 0
+_op_connect = int(os.getenv('ZK_LOCUST_BENCH_OP_CONNECT', '1')) != 0
 
 _logging_level = logging.DEBUG
 
@@ -240,5 +244,26 @@ register_extra_stats(fn=_locust_stats_handler)
 register_zk_metrics()
 
 
-class Set(ZKLocust):
-    task_set = ZKSetTaskSet
+class LocustBase(ZKLocust):
+    def __init__(self, *args, **kwargs):
+        super(LocustBase, self).__init__(*args, **kwargs)
+
+
+if _op_get:
+    class Get(LocustBase):
+        task_set = ZKGetTaskSet
+
+
+if _op_set:
+    class Set(LocustBase):
+        task_set = ZKSetTaskSet
+
+
+if _op_connect:
+    class Connect(LocustBase):
+        task_set = ZKConnectTaskSet
+
+        def __init__(self):
+            # Unlike other locust instances, this one must not "autostart"
+            # the ZK client.
+            super(Connect, self).__init__(pseudo_root=None, autostart=False)
