@@ -135,8 +135,8 @@ class KazooLocustClient(AbstractZKLocustClient):
     def has_sasl_auth(self):
         return self._sasl_options is not None
 
-    def get_zk_client(self):
-        if self._started:
+    def get_zk_client(self, stopped_ok=False):
+        if self._started or stopped_ok:
             return super(KazooLocustClient, self).get_zk_client()
         raise KazooLocustStoppedException()
 
