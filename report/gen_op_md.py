@@ -1040,7 +1040,7 @@ class ErrorsPlotter(AbstractPlotter):
                 w_ids = x_df.client_id.unique()
 
                 x_df[key].rolling(
-                    len(w_ids), center=True).sum().plot.line(
+                    len(w_ids), center=False).sum().plot.line(
                         ax=ax, legend=False, color=color)
 
                 is_per_worker = len(w_ids) > 1 and self._per_worker
