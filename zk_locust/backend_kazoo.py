@@ -119,10 +119,10 @@ class KazooLocustClient(AbstractZKLocustClient):
     def node_exists_except(self):
         return kazoo.exceptions.NodeExistsError
 
-    def start(self):
+    def start(self, *args, **kwargs):
         if self._started:
             raise KazooLocustStartedException()
-        super(KazooLocustClient, self).get_zk_client().start()
+        super(KazooLocustClient, self).get_zk_client().start(*args, **kwargs)
         self._started = True
         # Messy.
         self.ensure_pseudo_root()
